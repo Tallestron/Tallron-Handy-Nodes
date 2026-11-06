@@ -29,6 +29,9 @@ class TallronNoteList:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                # Full list of notes as JSON. Hidden by the frontend; survives
+                # workflow save/load. May be a plain array (legacy) or
+                # {"notes": [...], "activeId": "..."}.
                 "notes_json": (
                     "STRING",
                     {
@@ -36,6 +39,8 @@ class TallronNoteList:
                         "multiline": True,
                     },
                 ),
+                # The note text currently staged for the STRING output.
+                # Set by the frontend when the user clicks Output.
                 "selected_note": (
                     "STRING",
                     {
@@ -53,6 +58,7 @@ class TallronNoteList:
     OUTPUT_NODE = False
 
     def get_note(self, notes_json, selected_note):
+        # notes_json is only for persistence; the actual payload is selected_note
         text = selected_note if isinstance(selected_note, str) else ""
         return (text,)
 
