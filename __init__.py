@@ -1,44 +1,31 @@
 """
 Tallron — collection of ComfyUI custom nodes.
 
-Place this entire folder inside ComfyUI/custom_nodes/ and restart.
-All nodes appear under the "Tallron" category.
+Install: put this folder in ComfyUI/custom_nodes/ and restart ComfyUI.
+Nodes appear under the "Tallron" category.
 """
 
-from .MP_Resolution.node_mp_resolution import (
-    NODE_CLASS_MAPPINGS as _MP_MAPPINGS,
-    NODE_DISPLAY_NAME_MAPPINGS as _MP_DISPLAY,
-)
-from .LoadImageDownsizer.node_load_image_downsizer import (
-    NODE_CLASS_MAPPINGS as _LID_MAPPINGS,
-    NODE_DISPLAY_NAME_MAPPINGS as _LID_DISPLAY,
-)
-from .ReferenceImageLoader.node_reference_image_loader import (
-    NODE_CLASS_MAPPINGS as _RIL_MAPPINGS,
-    NODE_DISPLAY_NAME_MAPPINGS as _RIL_DISPLAY,
-)
-from .NoteList.node_note_list import (
-    NODE_CLASS_MAPPINGS as _NL_MAPPINGS,
-    NODE_DISPLAY_NAME_MAPPINGS as _NL_DISPLAY,
-)
-from .ImageCompare.node_image_compare import (
-    NODE_CLASS_MAPPINGS as _IC_MAPPINGS,
-    NODE_DISPLAY_NAME_MAPPINGS as _IC_DISPLAY,
-)
+from importlib import import_module
 
 NODE_CLASS_MAPPINGS = {}
-NODE_CLASS_MAPPINGS.update(_MP_MAPPINGS)
-NODE_CLASS_MAPPINGS.update(_LID_MAPPINGS)
-NODE_CLASS_MAPPINGS.update(_RIL_MAPPINGS)
-NODE_CLASS_MAPPINGS.update(_NL_MAPPINGS)
-NODE_CLASS_MAPPINGS.update(_IC_MAPPINGS)
-
 NODE_DISPLAY_NAME_MAPPINGS = {}
-NODE_DISPLAY_NAME_MAPPINGS.update(_MP_DISPLAY)
-NODE_DISPLAY_NAME_MAPPINGS.update(_LID_DISPLAY)
-NODE_DISPLAY_NAME_MAPPINGS.update(_RIL_DISPLAY)
-NODE_DISPLAY_NAME_MAPPINGS.update(_NL_DISPLAY)
-NODE_DISPLAY_NAME_MAPPINGS.update(_IC_DISPLAY)
+
+
+def _load(submodule, label):
+    """Import one node module; skip on error so other nodes still register."""
+    try:
+        mod = import_module(submodule, package=__name__)
+        NODE_CLASS_MAPPINGS.update(getattr(mod, "NODE_CLASS_MAPPINGS", {}) or {})
+        NODE_DISPLAY_NAME_MAPPINGS.update(getattr(mod, "NODE_DISPLAY_NAME_MAPPINGS", {}) or {})
+    except Exception as e:
+        print(f"[Tallron] WARNING: failed to load {label}: {e}")
+
+
+_load(".MP_Resolution.node_mp_resolution", "MP Resolution")
+_load(".LoadImageDownsizer.node_load_image_downsizer", "Advanced Image Loader")
+_load(".ReferenceImageLoader.node_reference_image_loader", "Reference Image Loader")
+_load(".NoteList.node_note_list", "Note List")
+_load(".ImageCompare.node_image_compare", "Image Compare")
 
 WEB_DIRECTORY = "./js"
 
