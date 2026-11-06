@@ -38,6 +38,8 @@ class TallronCompare:
 
     @classmethod
     def INPUT_TYPES(s):
+        # Both optional so a muted / bypassed / unconnected branch does NOT
+        # raise ComfyUI's "required input is missing" system error.
         return {
             "optional": {
                 "image1": (
@@ -71,6 +73,8 @@ class TallronCompare:
     CATEGORY = "Tallron"
 
     def compare_images(self, image1=None, image2=None):
+        # Tag each saved image with its slot (1 / 2) so the frontend maps it to
+        # the right side even when only one is present.
         pairs = [(1, image1), (2, image2)]
         present = [(slot, t) for (slot, t) in pairs if t is not None]
 
