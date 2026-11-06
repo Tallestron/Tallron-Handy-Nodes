@@ -1,46 +1,116 @@
 """Image Compare (Tallron)
 
 Side-by-side / overlay / difference viewer for two IMAGE inputs.
-Frontend lives in js/image_compare.js.
+Both inputs are optional so muted or bypassed branches never raise a
+missing-input system error.
 """
 
-import torch
+import os
+import random
+import numpy as np
+from PIL import Image
+import folder_paths
 
 
-class TallronImageCompare:
-    """
-    Pass-through dual IMAGE node whose UI compares the two inputs.
-    Outputs both images unchanged for downstream wiring.
-    """
+class TallronCompare:
+    DESCRIPTION = (
+        "Image Compare — the easiest way to see the difference between "
+        "two images. Wire any two IMAGE outputs into image1 and image2 (e.g. "
+        "before / after upscaling, original / inpainted, two checkpoint variants), "
+        "then run the workflow.\n\n"
+        "The on-node viewer offers side-by-side with a draggable slider, "
+        "overlap with adjustable opacity, or 'diff' which highlights "
+        "exactly what changed between the two.\n\n"
+        "Both inputs are optional. If only one image is connected (for example "
+        "when a branch feeding one input is muted or bypassed), the node just "
+        "shows that image; if neither is connected it shows a short note — it "
+        "never throws a system error, so it is safe to leave in a workflow that "
+        "toggles between text-to-image and image-to-image."
+    )
+
+    def __init__(self):
+        self.output_dir = folder_paths.get_temp_directory()
+        self.type = "temp"
+        self.prefix_append = "_tlrcmp_" + "".join(
+            random.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(5)
+        )
+        self.compress_level = 4
 
     @classmethod
-    def INPUT_TYPES(cls):
+    def INPUT_TYPES(s):
         return {
-            "required": {
-                "image_a": ("IMAGE",),
-                "image_b": ("IMAGE",),
+            "optional": {
+                "image1": (
+                    "IMAGE",
+                    {
+                        "tooltip": (
+                            "First image to compare (e.g. the 'before' image). "
+                            "Optional — if it isn't connected, or its branch is "
+                            "muted / bypassed, the node just shows the other image "
+                            "(or a note) instead of throwing an error."
+                        ),
+                    },
+                ),
+                "image2": (
+                    "IMAGE",
+                    {
+                        "tooltip": (
+                            "Second image to compare (e.g. the 'after' image). "
+                            "Optional — the on-node viewer compares once BOTH "
+                            "images arrive; with only one connected it simply "
+                            "shows that one, and with neither it shows a short note."
+                        ),
+                    },
+                ),
             }
         }
 
-    RETURN_TYPES = ("IMAGE", "IMAGE")
-    RETURN_NAMES = ("image_a", "image_b")
-    FUNCTION = "compare"
+    RETURN_TYPES = ()
+    FUNCTION = "compare_images"
+    OUTPUT_NODE = True
     CATEGORY = "Tallron"
-    DESCRIPTION = (
-        "Image Compare — side-by-side, overlay, or difference view of two images. "
-        "Outputs both images unchanged."
-    )
 
-    def compare(self, image_a, image_b):
-        return (image_a, image_b)
+    def compare_images(self, image1=None, image2=None):
+        pairs = [(1, image1), (2, image2)]
+        present = [(slot, t) for (slot, t) in pairs if t is not None]
+
+        results = []
+        if present:
+            first = present[0][1]
+            prefix = "tallron_compare" + self.prefix_append
+            full_output_folder, filename, counter, subfolder, _ = (
+                folder_paths.get_save_image_path(
+                    prefix,
+                    self.output_dir,
+                    first[0].shape[1],
+                    first[0].shape[0],
+                )
+            )
+            for (slot, tensor) in present:
+                i = 255.0 * tensor[0].cpu().numpy()
+                img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
+                file = f"{filename}_{counter:05}_.png"
+                img.save(
+                    os.path.join(full_output_folder, file),
+                    compress_level=self.compress_level,
+                )
+                results.append(
+                    {
+                        "filename": file,
+                        "subfolder": subfolder,
+                        "type": self.type,
+                        "slot": slot,
+                    }
+                )
+                counter += 1
+
+        return {"ui": {"images": results}}
 
 
 NODE_CLASS_MAPPINGS = {
-    "TallronImageCompare": TallronImageCompare,
-    "TallronCompare": TallronImageCompare,
+    "TallronCompare": TallronCompare,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "TallronImageCompare": "Image Compare",
     "TallronCompare": "Image Compare",
 }
