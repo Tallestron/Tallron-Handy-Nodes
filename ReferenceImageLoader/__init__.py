@@ -1,5 +1,5 @@
-"""Tallron — Reference Image Loader custom node for ComfyUI."""
+"""Tallron — Load Image Downsizer custom node for ComfyUI."""
 
-from .node_reference_image_loader import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
+from .node_load_image_downsizer import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
