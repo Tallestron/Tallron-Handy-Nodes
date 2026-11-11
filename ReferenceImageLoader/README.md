@@ -1,41 +1,18 @@
-# Load Image Downsizer (Tallron)
+# Reference Image Loader (Tallron)
 
-ComfyUI node that behaves like the built-in **Load Image** node, with:
+Load up to **10 reference images** in a resizable 2-wide grid.
 
-1. **Crop** — open a dialog, drag a box; preview and outputs use that region  
-2. **Megapixel downsize** — extra image output scaled to a target MP budget  
+## Features
 
-## Outputs
-
-| Output | Description |
-|--------|-------------|
-| `image` | Loaded image after optional crop (full resolution of the crop) |
-| `mask` | Alpha mask (`1 - alpha`), cropped to match. Black when source has no alpha |
-| `image_downsized` | Cropped image resized so width × height ≈ megapixels × 1 000 000 |
-
-## Inputs
-
-- **image** – file picker / upload (same as Load Image)
-- **megapixels** – target megapixels for the downsized output (`0` = no resize)
-- **upscale_method** – interpolation used when resizing (`lanczos` recommended)
-- **crop** (hidden) – normalized crop box JSON written by the Crop dialog
-
-## Crop UI
-
-1. Select / upload an image (standard Load Image controls).
-2. Click **Crop** on the node.
-3. In the dialog, drag on the image to draw a selection box.  
-   Drag inside the box to move it. Pixel size is shown on the frame.
-4. **Apply** — stores the crop, closes the dialog, and updates the node preview to the cropped region.  
-   **Clear crop** — removes the crop (full image again).  
-   **Cancel** / Escape — leave crop unchanged.
-
-Crop is saved with the workflow. Changing the source image keeps the previous crop coords until you clear or re-crop.
+- `num_slots` (1–10) controls visible cells; node height auto-fits
+- `index_style`: Qwen (Image 1…) or Flux (Image 0…)
+- Click or drag-drop per cell; live thumbnails; clear (×)
+- **Reorder** — drag the ⠿ handle on a cell header onto another cell to swap images (crops move with them)
+- **Crop on every slot** — compact **Crop** button over the top-left of each preview
+- Empty slots return **None**
+- Outputs: Image 1–10, `batch`, full-size first image
+- Shared megapixel resize + fit mode
 
 ## Category
 
-**Tallron**
-
-## Installation
-
-Place the whole `tallron` folder in `ComfyUI/custom_nodes/`, restart, hard-refresh the browser (Ctrl+F5).
+**Tallron Handy Nodes** → **Reference Image Loader**

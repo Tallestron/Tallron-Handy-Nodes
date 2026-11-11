@@ -2,7 +2,7 @@
 Tallron — collection of ComfyUI custom nodes.
 
 Install: put this folder in ComfyUI/custom_nodes/ and restart ComfyUI.
-Nodes appear under the "Tallron" category.
+Nodes appear under the "Tallron Handy Nodes" category.
 """
 
 from importlib import import_module

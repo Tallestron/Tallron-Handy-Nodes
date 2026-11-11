@@ -54,7 +54,7 @@ class TallronNoteList:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("text",)
     FUNCTION = "get_note"
-    CATEGORY = "Tallron"
+    CATEGORY = "Tallron Handy Nodes"
     OUTPUT_NODE = False
 
     def get_note(self, notes_json, selected_note):

@@ -1,41 +1,49 @@
-# Load Image Downsizer (Tallron)
+# Advanced Image Loader (Tallron Handy Nodes)
 
-ComfyUI node that behaves like the built-in **Load Image** node, with:
+Drop-in style replacement for ComfyUI’s built-in **Load Image** node, with interactive crop and a megapixel-budget resize output.
 
-1. **Crop** — open a dialog, drag a box; preview and outputs use that region  
-2. **Megapixel downsize** — extra image output scaled to a target MP budget  
+## Features
 
-## Outputs
-
-| Output | Description |
-|--------|-------------|
-| `image` | Loaded image after optional crop (full resolution of the crop) |
-| `mask` | Alpha mask (`1 - alpha`), cropped to match. Black when source has no alpha |
-| `image_downsized` | Cropped image resized so width × height ≈ megapixels × 1 000 000 |
+- **Standard load** — same file picker / upload as Load Image (`image_upload`)
+- **Crop** — on-node **Crop** button opens a dialog; drag a box (or move an existing one); **Apply** saves the region to the workflow
+- **Clear crop** — removes the crop so outputs use the full image again
+- Crop is stored with the workflow and applied on execution (node preview stays the full image)
+- **Megapixel downsize** — `image_downsized` scaled so W × H ≈ megapixels × 1 000 000 (aspect kept)
+- `megapixels = 0` keeps the cropped (or full) resolution with no resize
+- Selectable **upscale_method** (lanczos, nearest-exact, bilinear, area, bicubic)
+- **Mask** output from alpha (`1 − alpha`); solid black when the source has no alpha
+- Crop is applied to both image and mask before the optional megapixel resize
 
 ## Inputs
 
-- **image** – file picker / upload (same as Load Image)
-- **megapixels** – target megapixels for the downsized output (`0` = no resize)
-- **upscale_method** – interpolation used when resizing (`lanczos` recommended)
-- **crop** (hidden) – normalized crop box JSON written by the Crop dialog
+| Input | Type | Description |
+|-------|------|-------------|
+| `image` | combo / upload | Image from the ComfyUI input folder |
+| `megapixels` | FLOAT | Target MP for `image_downsized` (0 = no resize) |
+| `upscale_method` | combo | Interpolation used when resizing |
+| `crop` | STRING (hidden) | Normalized crop box JSON written by the Crop dialog |
 
-## Crop UI
+## Outputs
 
-1. Select / upload an image (standard Load Image controls).
-2. Click **Crop** on the node.
-3. In the dialog, drag on the image to draw a selection box.  
-   Drag inside the box to move it. Pixel size is shown on the frame.
-4. **Apply** — stores the crop, closes the dialog, and updates the node preview to the cropped region.  
-   **Clear crop** — removes the crop (full image again).  
-   **Cancel** / Escape — leave crop unchanged.
-
-Crop is saved with the workflow. Changing the source image keeps the previous crop coords until you clear or re-crop.
+| Output | Type | Description |
+|--------|------|-------------|
+| `image` | IMAGE | Loaded image after optional crop (full resolution of the crop) |
+| `mask` | MASK | Alpha mask, cropped to match |
+| `image_downsized` | IMAGE | Cropped image resized to the megapixel target |
 
 ## Category
 
-**Tallron**
+**Tallron Handy Nodes** → **Advanced Image Loader**
 
-## Installation
+## Usage
 
-Place the whole `tallron` folder in `ComfyUI/custom_nodes/`, restart, hard-refresh the browser (Ctrl+F5).
+1. Add **Advanced Image Loader** from **Tallron Handy Nodes**
+2. Select or upload an image
+3. Optionally click **Crop**, draw a box, **Apply**
+4. Set **megapixels** if you need a smaller second output
+5. Wire `image`, `mask`, and/or `image_downsized`
+
+## Notes
+
+- After installing or updating, restart ComfyUI and hard-refresh the browser (Ctrl+F5)
+- Older workflows that used the previous internal id `LoadImageDownsizer` should re-add this node

@@ -1,5 +1,5 @@
 /**
- * Tallron — Load Image Downsizer
+ * Tallron — Advanced Image Loader
  *
  * Crop dialog stores a normalized box on node.properties.tld_crop and injects
  * it into the hidden Python "crop" input at run time.
@@ -9,7 +9,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
-const NODE_NAME = "LoadImageDownsizer";
+const NODE_NAME = "AdvancedImageLoader";
 const CSS_ID = "tallron-load-image-downsizer-css";
 const CROP_PROP = "tld_crop";
 const HIDDEN_INPUT_NAME = "crop";
@@ -526,7 +526,7 @@ app.graphToPrompt = async function (...args) {
     }
   } catch (e) {
     console.error(
-      "[Tallron] LoadImageDownsizer prompt injection failed; prompt sent unchanged",
+      "[Tallron] AdvancedImageLoader prompt injection failed; prompt sent unchanged",
       e
     );
   }
@@ -534,7 +534,7 @@ app.graphToPrompt = async function (...args) {
 };
 
 app.registerExtension({
-  name: "Tallron.LoadImageDownsizer",
+  name: "Tallron.AdvancedImageLoader",
 
   async beforeRegisterNodeDef(nodeType, nodeData) {
     if (nodeData.name !== NODE_NAME) return;
@@ -584,7 +584,7 @@ app.registerExtension({
           // Preview stays the full image; crop only affects outputs
           updateBtnState();
         } catch (err) {
-          console.error("[Tallron LoadImageDownsizer] crop failed", err);
+          console.error("[Tallron AdvancedImageLoader] crop failed", err);
           app.ui?.dialog?.show?.(
             err?.message || "Could not open crop dialog. Select an image first."
           );

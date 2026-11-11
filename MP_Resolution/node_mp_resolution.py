@@ -167,7 +167,7 @@ class TallronMPResolutionSelector:
         "Empty latent matching width × height and latent format.",
     )
     FUNCTION = "get_resolution"
-    CATEGORY = "Tallron"
+    CATEGORY = "Tallron Handy Nodes"
 
     def get_resolution(
         self,

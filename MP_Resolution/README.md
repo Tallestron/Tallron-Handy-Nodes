@@ -19,7 +19,7 @@ ComfyUI/
         README.md
 ```
 
-Restart ComfyUI. The node appears under **Tallron → MP Resolution Selector**.
+Restart ComfyUI. The node appears under **Tallron Handy Nodes → MP Resolution Selector**.
 
 ## Inputs
 

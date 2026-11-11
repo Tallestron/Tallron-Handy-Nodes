@@ -53,6 +53,7 @@ def _parse_crops(crop_str):
     except Exception:
         return empty
     if isinstance(data, dict) and "x" in data:
+        # Legacy single-box format
         box = _parse_one_crop(data)
         out = empty[:]
         out[0] = box
@@ -145,7 +146,7 @@ class TallronReferenceImageLoader:
         "batch", "Image 1 full size"
     )
     FUNCTION = "load"
-    CATEGORY = "Tallron"
+    CATEGORY = "Tallron Handy Nodes"
     DESCRIPTION = (
         "Reference Image Loader — up to 10 reference images in a resizable "
         "2-wide grid. Empty slots return None. "

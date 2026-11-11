@@ -70,7 +70,7 @@ class TallronCompare:
     RETURN_TYPES = ()
     FUNCTION = "compare_images"
     OUTPUT_NODE = True
-    CATEGORY = "Tallron"
+    CATEGORY = "Tallron Handy Nodes"
 
     def compare_images(self, image1=None, image2=None):
         # Tag each saved image with its slot (1 / 2) so the frontend maps it to

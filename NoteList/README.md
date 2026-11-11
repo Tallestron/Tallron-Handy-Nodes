@@ -23,7 +23,7 @@ STRING socket (`text`).
 
 ## Usage
 
-1. Drop the node from the **Tallron** category
+1. Drop the node from the **Tallron Handy Nodes** category
 2. Click **Add Note**, double-click the title to name it, expand and type
 3. Click **Output** on the note you want to use (green border = active)
 4. Connect the `text` output to any STRING input

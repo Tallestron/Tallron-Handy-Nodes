@@ -1,4 +1,4 @@
-"""Load Image Downsizer (Tallron)
+"""Advanced Image Loader (Tallron)
 
 Drop-in style replacement for ComfyUI's Load Image node with:
   - an extra IMAGE output resized to a target megapixel count
@@ -85,7 +85,7 @@ def _apply_crop_tensor(image, crop, is_mask=False):
     return image[:, y0:y1, x0:x1, :]
 
 
-class LoadImageDownsizer:
+class AdvancedImageLoader:
     """
     Loads an image the same way as the built-in Load Image node, optionally
     crops it to a region selected in the Crop dialog, and also produces a
@@ -145,11 +145,11 @@ class LoadImageDownsizer:
         "Cropped image resized to the target megapixel count (aspect ratio kept).",
     )
     FUNCTION = "load_image"
-    CATEGORY = "Tallron"
+    CATEGORY = "Tallron Handy Nodes"
     DESCRIPTION = (
-        "Load Image Downsizer — like the built-in Load Image node, plus:\n"
+        "Advanced Image Loader — like the built-in Load Image node, plus:\n"
         "• Crop button opens a dialog; drag a box to select a region; "
-        "the node preview and outputs use that crop.\n"
+        "outputs use that crop (node preview stays full image).\n"
         "• Extra image_downsized output resized to a chosen megapixel budget."
     )
 
@@ -270,9 +270,9 @@ class LoadImageDownsizer:
 
 
 NODE_CLASS_MAPPINGS = {
-    "LoadImageDownsizer": LoadImageDownsizer,
+    "AdvancedImageLoader": AdvancedImageLoader,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "LoadImageDownsizer": "Load Image Downsizer",
+    "AdvancedImageLoader": "Advanced Image Loader",
 }
