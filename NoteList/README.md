@@ -1,7 +1,7 @@
 # Note List (Tallron)
 
-On-node directory of named notes with expand/collapse, drag-to-reorder,
-copy-to-clipboard, and an **Output** button that pushes the note text to the
+On-node directory of named notes with expand/collapse, drag-to-reorder, and
+copy-to-clipboard. **Click a note** to highlight it and send its text to the
 STRING socket (`text`).
 
 ## Features
@@ -10,9 +10,8 @@ STRING socket (`text`).
 - **Title** always visible — **double-click** to rename
 - **+ / −** expands or collapses the note body
 - Expanded textareas **auto-size** to fit the full content
-- **Copy** — copies note content to the system clipboard
-- **Output** — always visible on the title row (left of ×); writes the note
-  content into the node's `text` STRING output and highlights that note as active
+- **Click a note** — highlights it (green border) and pushes content to `text`
+- **Copy** — on the title row; copies note content to the system clipboard
 - **Drag handle** on the left of each row to reorder notes
 - **Delete (×)** asks for confirmation before removing a note
 - Notes (and which one is active) persist inside the workflow
@@ -25,7 +24,7 @@ STRING socket (`text`).
 
 1. Drop the node from the **Tallron Handy Nodes** category
 2. Click **Add Note**, double-click the title to name it, expand and type
-3. Click **Output** on the note you want to use (green border = active)
+3. **Click the note** you want to use (green border = active → STRING output)
 4. Connect the `text` output to any STRING input
 5. **Export** saves a JSON backup; **Import** loads it back (replace or append)
 

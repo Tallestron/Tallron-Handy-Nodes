@@ -5,7 +5,7 @@ const NODE_WIDTH = 340;
 const LIST_MIN_H = 180;
 const LIST_MAX_H = 720;
 const ROW_COLLAPSED_H = 36;
-const ROW_BODY_CHROME = 40; // actions row + padding when expanded
+const ROW_BODY_CHROME = 16; // body padding when expanded (no action bar)
 const TEXTAREA_MIN_H = 48;
 const TEXTAREA_MAX_H = 400;
 
@@ -107,7 +107,7 @@ function injectCSS() {
     gap: 4px;
     padding: 4px 6px;
     min-height: ${ROW_COLLAPSED_H - 8}px;
-    cursor: default;
+    cursor: pointer;
 }
 .tnl-handle {
     flex: 0 0 18px;
@@ -184,16 +184,16 @@ function injectCSS() {
     cursor: text;
 }
 
-.tnl-output-head {
+.tnl-copy-head {
     flex: 0 0 auto;
     height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #2a5a3a;
-    border: 1px solid #3a7a4a;
+    background: #333;
+    border: 1px solid #444;
     border-radius: 4px;
-    color: #b8e0c0;
+    color: #ccc;
     font-size: 10px;
     font-weight: 600;
     cursor: pointer;
@@ -202,15 +202,10 @@ function injectCSS() {
     white-space: nowrap;
     transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
-.tnl-output-head:hover {
-    background: #346a44;
-    border-color: #4a9a5a;
+.tnl-copy-head:hover {
+    background: #3a3a3a;
+    border-color: #555;
     color: #fff;
-}
-.tnl-output-head.active {
-    background: #1a4a2a;
-    border-color: #2a7a3a;
-    color: #c8f0d0;
 }
 
 .tnl-delete {
@@ -823,13 +818,18 @@ app.registerExtension({
             }
         };
 
-        nodeType.prototype._tnlOutput = function (id, btn) {
+        /** Highlight a note and push its content to the STRING output. */
+        nodeType.prototype._tnlSelect = function (id) {
             const n = this._tnl.notes.find((x) => x.id === id);
             if (!n) return;
+            if (this._tnl.activeId === id) {
+                // Already selected — still refresh output in case content changed
+                setSelectedNote(this, n.content);
+                return;
+            }
             this._tnl.activeId = id;
             setSelectedNote(this, n.content);
             writeState(this, this._tnl.notes, this._tnl.activeId);
-            // Re-render so only this row has the active border
             this._tnlRender();
         };
 
@@ -982,23 +982,27 @@ app.registerExtension({
                 e.stopPropagation();
             });
             enableNativeTextMenu(titleInput);
+            // Single-click title (when not editing) selects the note for output
+            titleInput.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (titleInput.readOnly) {
+                    this._tnlSelect(note.id);
+                }
+            });
             head.appendChild(titleInput);
 
-            // Output — always visible in the title row (no expand needed)
-            const outputBtn = document.createElement("button");
-            outputBtn.className =
-                "tnl-output-head" +
-                (this._tnl.activeId === note.id ? " active" : "");
-            outputBtn.type = "button";
-            outputBtn.textContent =
-                this._tnl.activeId === note.id ? "Output ✓" : "Output";
-            outputBtn.title = "Set this note as the STRING output";
-            outputBtn.addEventListener("click", (e) => {
+            // Copy — always visible in the title row
+            const copyBtn = document.createElement("button");
+            copyBtn.className = "tnl-copy-head";
+            copyBtn.type = "button";
+            copyBtn.textContent = "Copy";
+            copyBtn.title = "Copy note content to clipboard";
+            copyBtn.addEventListener("click", (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this._tnlOutput(note.id, outputBtn);
+                this._tnlCopy(note.id, copyBtn);
             });
-            head.appendChild(outputBtn);
+            head.appendChild(copyBtn);
 
             const delBtn = document.createElement("button");
             delBtn.className = "tnl-delete";
@@ -1011,6 +1015,18 @@ app.registerExtension({
                 this._tnlDeleteNote(note.id);
             });
             head.appendChild(delBtn);
+
+            // Clicking the row head (not buttons) selects the note → STRING output
+            head.addEventListener("click", (e) => {
+                if (
+                    e.target.closest(
+                        ".tnl-handle, .tnl-expand, .tnl-copy-head, .tnl-delete, .tnl-title"
+                    )
+                ) {
+                    return;
+                }
+                this._tnlSelect(note.id);
+            });
 
             row.appendChild(head);
 
@@ -1036,21 +1052,6 @@ app.registerExtension({
             enableNativeTextMenu(textarea);
             body.appendChild(textarea);
 
-            const actions = document.createElement("div");
-            actions.className = "tnl-actions";
-
-            const copyBtn = document.createElement("button");
-            copyBtn.className = "tnl-btn";
-            copyBtn.type = "button";
-            copyBtn.textContent = "Copy";
-            copyBtn.addEventListener("click", (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this._tnlCopy(note.id, copyBtn);
-            });
-            actions.appendChild(copyBtn);
-
-            body.appendChild(actions);
             row.appendChild(body);
 
             return row;

@@ -9,7 +9,8 @@ Utility nodes for ComfyUI. All nodes appear under the **Tallron Handy Nodes** ca
 | **Advanced Image Loader** | Load Image + interactive crop + megapixel-budget downsized output |
 | **Reference Image Loader** | Up to 10 reference images in a 2-wide grid, per-slot crop, MP resize, Qwen/Flux labels |
 | **MP Resolution Selector** | On-node resolution picker calibrated to megapixel targets / model profiles |
-| **Note List** | Reorderable notes with expand/collapse, copy, Output → STRING, import/export |
+| **Note List** | Reorderable notes with expand/collapse, click → STRING, copy, import/export |
+| **Prompt Vault** | Categorized prompts with 1024×1024 images, resizable preview, Copy → STRING |
 | **Image Compare** | Side-by-side / overlay / difference viewer for two images |
 
 ---
@@ -40,8 +41,20 @@ Utility nodes for ComfyUI. All nodes appear under the **Tallron Handy Nodes** ca
 ### Note List
 
 - Named notes with expand/collapse, auto-sizing text areas
-- **Output** selects the active note into the `text` STRING output
-- Reorder, copy, delete with confirm; import / export JSON (Markdown import supported)
+- **Click a note** to highlight it and stage its content on the `text` STRING output
+- **Copy** on the title row copies to the clipboard
+- Reorder, delete with confirm; import / export JSON (Markdown import supported)
+
+### Prompt Vault
+
+- **Categories** on the left filter which prompts are shown (All + user categories)
+- Named prompts with expand/collapse and auto-sizing text areas
+- **Click a row** to select it (green border) and stage the prompt on the `text` STRING output
+- **Copy** button copies to clipboard and selects the prompt
+- Right-side **image preview**; drag the divider to resize the panel
+- **Load Image** resizes the chosen file to 1024×1024 (center-crop cover)
+- Click the preview to open a full-size lightbox; **Clear** removes the image
+- Reorder, delete with confirm; import / export JSON (categories + images included)
 
 ### Image Compare
 
@@ -53,7 +66,7 @@ Utility nodes for ComfyUI. All nodes appear under the **Tallron Handy Nodes** ca
 
 ## Installation
 
-1. Copy the entire `tallron` folder into `ComfyUI/custom_nodes/`
+1. Copy the entire package folder into `ComfyUI/custom_nodes/`
 2. Restart ComfyUI
 3. Hard-refresh the browser (Ctrl+F5)
 
@@ -62,20 +75,22 @@ Nodes appear under **Tallron Handy Nodes**.
 ## Project layout
 
 ```
-tallron/
+Tallron-Handy-Nodes/
 ├── __init__.py                 # Registers all nodes
 ├── README.md
 ├── js/                         # Shared frontend scripts
-│   ├── load_image_downsizer.js # Advanced Image Loader UI
+│   ├── load_image_downsizer.js
 │   ├── reference_loader.js
 │   ├── mp_resolution.js
 │   ├── note_list.js
+│   ├── prompt_vault.js
 │   └── image_compare.js
-├── LoadImageDownsizer/         # Advanced Image Loader
+├── LoadImageDownsizer/
 ├── ReferenceImageLoader/
 ├── MP_Resolution/
 ├── NoteList/
+├── PromptVault/
 └── ImageCompare/
 ```
 
-Future nodes: add a sibling package under `tallron/` and register it in the top-level `__init__.py`.
+Future nodes: add a sibling package under the root and register it in the top-level `__init__.py`.

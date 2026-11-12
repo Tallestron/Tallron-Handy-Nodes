@@ -1,7 +1,7 @@
 """Note List (Tallron)
 
-A persistent, reorderable list of named notes with expand/collapse,
-copy-to-clipboard, and an Output button that pushes the note text to the
+A persistent, reorderable list of named notes with expand/collapse and
+copy-to-clipboard. Click a note to highlight it and send its text to the
 STRING output for wiring into other nodes.
 """
 
@@ -11,18 +11,16 @@ class TallronNoteList:
     On-node note pad with a directory-style list.
 
     - Add Note creates a blank entry at the top.
-    - Title is always visible (double-click to rename); expand (+) reveals
-      content + Copy / Output.
+    - Title is always visible (double-click to rename); expand (+) reveals content.
     - Drag handle reorders notes.
-    - Output writes the note content into the STRING output and highlights
-      that note as the active source.
+    - Click a note to highlight it and push its content to the STRING output.
+    - Copy on the title row copies content to the clipboard.
     """
 
     DESCRIPTION = (
         "Note List — keep a reorderable directory of named notes on the node. "
-        "Expand a note to edit its content, copy it, or Output it to the STRING "
-        "socket so it can be wired into any other node. The active note is "
-        "highlighted."
+        "Click a note to highlight it and send its text to the STRING socket. "
+        "Use Copy on the title row for the clipboard."
     )
 
     @classmethod
