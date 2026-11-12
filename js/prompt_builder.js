@@ -11,6 +11,31 @@ function uid() {
     return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 }
 
+const DEFAULT_SYSTEM_ASSEMBLE = "You assemble image-generation prompts. Rewrite the user's notes into one clean prompt. Keep every subject, clothing, setting, lighting, and style detail they included. Output only the prompt, with no quotes and no explanation.";
+const DEFAULT_SYSTEM_ENHANCE = "You enhance image-generation prompts. Expand the user's notes with specific visual detail: lighting, lens, materials, mood, and composition. Do not contradict or drop anything they asked for. Output only the prompt, with no quotes and no explanation.";
+
+function defaultTextgen() {
+    return {
+        model: "",
+        type: "qwen_image",
+        max_length: 512,
+        sampling_mode: "on",
+        temperature: 0.7,
+        top_k: 64,
+        top_p: 0.95,
+        min_p: 0.05,
+        repetition_penalty: 1.05,
+        presence_penalty: 0,
+        seed: 0,
+        seedMode: "fixed",
+        thinking: false,
+        mtp: "auto",
+        systemAssemble: DEFAULT_SYSTEM_ASSEMBLE,
+        systemEnhance: DEFAULT_SYSTEM_ENHANCE,
+        systemCustom: "",
+    };
+}
+
 const TAG_COLORS = [
     "#e74c3c", // red
     "#e67e22", // orange
@@ -169,6 +194,7 @@ function injectCSS() {
     border-radius: 6px;
     overflow: hidden;
     min-width: 0;
+    min-height: 0;
     max-width: 100%;
     font-family: system-ui, -apple-system, sans-serif;
     font-size: 12px;
@@ -233,7 +259,7 @@ function injectCSS() {
 }
 .tpb-top {
     display: flex;
-    flex: 1 1 auto;
+    flex: 1 1 0%;
     min-height: 0;
     min-width: 0;
     width: 100%;
@@ -242,7 +268,10 @@ function injectCSS() {
 .tpb-col {
     display: flex;
     flex-direction: column;
+    position: relative;
     min-width: 0;
+    min-height: 0;
+    align-self: stretch;
     overflow: hidden;
 }
 .tpb-col-left {
@@ -287,8 +316,10 @@ function injectCSS() {
     padding: 1px 4px;
     outline: none;
     font-family: inherit;
-    user-select: text;
-    -webkit-user-select: text;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    caret-color: #fff;
+    cursor: text;
     pointer-events: auto;
     position: relative;
     z-index: 2;
@@ -366,7 +397,11 @@ function injectCSS() {
 .tpb-btn-blue:hover { background: #4a8be5; }
 .tpb-btn-blue:active { background: #2a6bc5; }
 .tpb-list {
-    flex: 1 1 auto;
+    position: absolute;
+    top: 34px;
+    left: 0;
+    right: 0;
+    bottom: 0;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 4px;
@@ -374,7 +409,6 @@ function injectCSS() {
     flex-direction: column;
     gap: 2px;
     min-height: 0;
-    max-height: 100%;
 }
 .tpb-list::-webkit-scrollbar { width: 5px; }
 .tpb-list::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
@@ -453,8 +487,8 @@ function injectCSS() {
     flex-direction: column;
     border-top: 1px solid #333;
     background: #161616;
-    min-height: 120px;
-    max-height: 55%;
+    min-height: 0;
+    max-height: 40%;
     overflow: hidden;
     width: 100%;
     box-sizing: border-box;
@@ -548,7 +582,7 @@ function injectCSS() {
 .tpb-modal-cancel { background: #444; color: #ccc; }
 .tpb-modal-ok { background: #3a7bd5; color: #fff; }
 .tpb-selected-list {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 4px 6px;
@@ -556,7 +590,8 @@ function injectCSS() {
     flex-wrap: wrap;
     gap: 4px;
     align-content: flex-start;
-    min-height: 0;
+    min-height: 28px;
+    max-height: 88px;
 }
 .tpb-clear-wrap {
     display: flex;
@@ -637,6 +672,186 @@ function injectCSS() {
     word-break: break-word;
     background: #141414;
 }
+.tpb-gear {
+    margin-left: auto;
+    width: 22px;
+    height: 22px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #2a2a2a;
+    color: #ddd;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0;
+}
+.tpb-gear:hover { background: #3a3a3a; color: #fff; border-color: #5BA3F5; }
+.tpb-assemble {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 8px 8px;
+    border-top: 1px solid #333;
+    background: #121212;
+    min-width: 0;
+}
+.tpb-assemble-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+.tpb-assemble-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #ddd;
+    margin-right: 4px;
+}
+.tpb-assemble-btn {
+    background: #2c3e50;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.tpb-assemble-btn:hover { background: #3d566e; }
+.tpb-assemble-btn:disabled { opacity: 0.55; cursor: default; }
+.tpb-assemble-btn.active { background: #3a7bd5; }
+.tpb-seed {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+.tpb-seed-label {
+    font-size: 10px;
+    color: #999;
+    font-weight: 600;
+}
+.tpb-seed input {
+    width: 92px;
+    background: #111;
+    border: 1px solid #444;
+    border-radius: 3px;
+    color: #eee;
+    font-size: 11px;
+    padding: 3px 4px;
+    font-family: inherit;
+    user-select: text;
+    -webkit-user-select: text;
+}
+.tpb-seed select {
+    background: #1c1c1c;
+    border: 1px solid #444;
+    border-radius: 3px;
+    color: #ccc;
+    font-size: 10px;
+    padding: 3px 2px;
+}
+.tpb-result-wrap {
+    position: relative;
+    min-width: 0;
+}
+.tpb-result-copy {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    z-index: 2;
+    background: #2c3e50;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.tpb-result-copy:hover { background: #3a7bd5; }
+.tpb-result {
+    width: 100%;
+    box-sizing: border-box;
+    height: 72px;
+    min-height: 36px;
+    resize: none;
+    overflow: auto;
+    background: #0e0e0e;
+    border: 1px solid #333;
+    border-radius: 4px 4px 0 0;
+    color: #d8d8d8;
+    font-family: inherit;
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 6px 8px 22px;
+    user-select: text;
+    -webkit-user-select: text;
+}
+.tpb-result-handle {
+    height: 8px;
+    cursor: ns-resize;
+    background: #1c1c1c;
+    border: 1px solid #333;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    flex-shrink: 0;
+    touch-action: none;
+    position: relative;
+}
+.tpb-result-handle::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 3px;
+    width: 42px;
+    height: 2px;
+    margin-left: -21px;
+    background: #666;
+    border-radius: 1px;
+}
+.tpb-result-handle:hover,
+.tpb-result-handle.dragging { background: #2a2a2a; }
+.tpb-result-handle:hover::after,
+.tpb-result-handle.dragging::after { background: #5BA3F5; }
+.tpb-result.error { color: #e88; border-color: #633; }
+.tpb-settings {
+    width: 520px;
+    max-height: 82vh;
+    overflow: auto;
+}
+.tpb-settings label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 10px;
+    color: #aaa;
+    margin-bottom: 8px;
+}
+.tpb-settings input,
+.tpb-settings select,
+.tpb-settings textarea {
+    background: #111;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #eee;
+    font-size: 12px;
+    padding: 4px 6px;
+    font-family: inherit;
+    user-select: text;
+    -webkit-user-select: text;
+}
+.tpb-settings textarea { min-height: 64px; resize: vertical; }
+.tpb-settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 10px;
+}
+.tpb-settings h3 { margin: 0 0 8px; font-size: 13px; color: #eee; }
+.tpb-settings h4 { margin: 10px 0 6px; font-size: 11px; color: #9cf; }
 `;
     document.head.appendChild(style);
 
@@ -881,6 +1096,8 @@ app.registerExtension({
                 activeCategoryId: null,
                 selected: [],
                 catWidth: 180,
+                textgen: defaultTextgen(),
+                assembled: "",
             };
             // Select first category by default
             if (this._tpb.categories.length) {
@@ -904,11 +1121,19 @@ app.registerExtension({
                     if (typeof data.catWidth === "number") {
                         this._tpb.catWidth = data.catWidth;
                     }
+                    if (data.textgen && typeof data.textgen === "object") {
+                        this._tpb.textgen = Object.assign(defaultTextgen(), data.textgen);
+                    }
                 } catch (_) {}
             }
 
             hideWidget(this, "builder_json");
             hideWidget(this, "composed_prompt");
+            hideWidget(this, "assembled_prompt");
+            const assembledW = getWidget(this, "assembled_prompt");
+            if (assembledW && typeof assembledW.value === "string") {
+                this._tpb.assembled = assembledW.value;
+            }
 
             // Build UI
             const root = document.createElement("div");
@@ -938,6 +1163,12 @@ app.registerExtension({
             clearColorBtn.textContent = "×";
             clearColorBtn.title = "Clear color of the selected category";
             colorBar.appendChild(clearColorBtn);
+            const gearBtn = document.createElement("button");
+            gearBtn.type = "button";
+            gearBtn.className = "tpb-gear";
+            gearBtn.textContent = "⚙";
+            gearBtn.title = "Text generate settings";
+            colorBar.appendChild(gearBtn);
             root.appendChild(colorBar);
 
             // Top split
@@ -1045,6 +1276,112 @@ app.registerExtension({
             bottom.appendChild(clearWrap);
             root.appendChild(bottom);
 
+            const assemble = document.createElement("div");
+            assemble.className = "tpb-assemble";
+            const assembleRow = document.createElement("div");
+            assembleRow.className = "tpb-assemble-row";
+            const assembleLabel = document.createElement("span");
+            assembleLabel.className = "tpb-assemble-label";
+            assembleLabel.textContent = "Assemble Prompt";
+            const simpleBtn = document.createElement("button");
+            simpleBtn.type = "button";
+            simpleBtn.className = "tpb-assemble-btn";
+            simpleBtn.textContent = "Simple";
+            simpleBtn.title = "Assemble the prompt with the Simple system prompt";
+            const enhanceBtn = document.createElement("button");
+            enhanceBtn.type = "button";
+            enhanceBtn.className = "tpb-assemble-btn";
+            enhanceBtn.textContent = "Enhance";
+            enhanceBtn.title = "Enhance the prompt with the Enhance system prompt";
+            const customBtn = document.createElement("button");
+            customBtn.type = "button";
+            customBtn.className = "tpb-assemble-btn";
+            customBtn.textContent = "Custom";
+            customBtn.title = "Run the custom system prompt";
+            assembleRow.appendChild(assembleLabel);
+            assembleRow.appendChild(simpleBtn);
+            assembleRow.appendChild(enhanceBtn);
+            assembleRow.appendChild(customBtn);
+            const seedWrap = document.createElement("div");
+            seedWrap.className = "tpb-seed";
+            const seedLabel = document.createElement("span");
+            seedLabel.className = "tpb-seed-label";
+            seedLabel.textContent = "Seed";
+            const seedInput = document.createElement("input");
+            seedInput.type = "number";
+            seedInput.min = "0";
+            seedInput.step = "1";
+            seedInput.title = "Seed used for the next generation";
+            seedInput.value = String(this._tpb.textgen?.seed ?? 0);
+            const seedMode = document.createElement("select");
+            seedMode.title = "What happens to the seed after a generation";
+            for (const [value, label] of [["fixed", "fixed"], ["increment", "+1"], ["decrement", "-1"], ["randomize", "random"]]) {
+                const opt = document.createElement("option");
+                opt.value = value;
+                opt.textContent = label;
+                seedMode.appendChild(opt);
+            }
+            seedMode.value = this._tpb.textgen?.seedMode || "fixed";
+            seedWrap.appendChild(seedLabel);
+            seedWrap.appendChild(seedInput);
+            seedWrap.appendChild(seedMode);
+            assembleRow.appendChild(seedWrap);
+            const resultWrap = document.createElement("div");
+            resultWrap.className = "tpb-result-wrap";
+            const resultBox = document.createElement("textarea");
+            resultBox.className = "tpb-result";
+            resultBox.readOnly = true;
+            resultBox.placeholder = "Generated prompt appears here";
+            resultBox.value = this._tpb.assembled || "";
+            const resultCopy = document.createElement("button");
+            resultCopy.type = "button";
+            resultCopy.className = "tpb-result-copy";
+            resultCopy.textContent = "Copy";
+            resultCopy.title = "Copy generated prompt";
+            resultWrap.appendChild(resultBox);
+            resultWrap.appendChild(resultCopy);
+            assemble.appendChild(assembleRow);
+            assemble.appendChild(resultWrap);
+            const resultHandle = document.createElement("div");
+            resultHandle.className = "tpb-result-handle";
+            resultHandle.title = "Drag to resize the output";
+            assemble.appendChild(resultHandle);
+            root.appendChild(assemble);
+            resultHandle.addEventListener("pointerdown", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                resultHandle.classList.add("dragging");
+                const startY = e.clientY;
+                const startH = resultBox.offsetHeight;
+                const scaleOf = () => {
+                    const ds = app.canvas?.ds?.scale;
+                    if (ds && ds > 0.05) return ds;
+                    const nodeEl = root.closest(".lg-node, .comfy-vue-node, .graphnode");
+                    if (nodeEl && nodeEl.offsetHeight) {
+                        const r = nodeEl.getBoundingClientRect().height / nodeEl.offsetHeight;
+                        if (r > 0.05) return r;
+                    }
+                    return 1;
+                };
+                const move = (ev) => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    const next = Math.max(36, Math.min(360, startH + (ev.clientY - startY) / scaleOf()));
+                    resultBox.style.height = next + "px";
+                };
+                const up = (ev) => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    resultHandle.classList.remove("dragging");
+                    window.removeEventListener("pointermove", move, true);
+                    window.removeEventListener("pointerup", up, true);
+                    window.removeEventListener("pointercancel", up, true);
+                };
+                window.addEventListener("pointermove", move, true);
+                window.addEventListener("pointerup", up, true);
+                window.addEventListener("pointercancel", up, true);
+            });
+
             const domWidget = this.addDOMWidget("prompt_builder_ui", "div", root, {
                 serialize: false,
                 hideOnZoom: false,
@@ -1056,12 +1393,12 @@ app.registerExtension({
                 this._tpb.lockedH = locked;
                 root.style.height = locked + "px";
                 root.style.maxHeight = locked + "px";
+                root.style.minHeight = "0";
                 root.style.overflow = "hidden";
-                domWidget.computedHeight = locked;
             };
             domWidget.computeSize = function (width) {
                 const nodeW = this.size?.[0] || width || NODE_WIDTH;
-                return [Math.max(160, nodeW - 24), this._tpb.lockedH];
+                return [Math.max(160, nodeW - 24), 200];
             }.bind(this);
             root.style.boxSizing = "border-box";
             root.style.minWidth = "0";
@@ -1085,6 +1422,7 @@ app.registerExtension({
                     activeCategoryId: this._tpb.activeCategoryId,
                     selected: this._tpb.selected,
                     catWidth: this._tpb.catWidth,
+                    textgen: this._tpb.textgen,
                 };
                 const w = getWidget(this, "builder_json");
                 if (w) w.value = JSON.stringify(data);
@@ -1155,6 +1493,52 @@ app.registerExtension({
             const fitCatWidth = () => {};
 
             let activeRename = null;
+            const askConfirm = (message) => new Promise((resolve) => {
+                const overlay = document.createElement("div");
+                overlay.className = "tpb-modal-overlay";
+                const modal = document.createElement("div");
+                modal.className = "tpb-modal";
+                const p = document.createElement("p");
+                p.textContent = message;
+                const actions = document.createElement("div");
+                actions.className = "tpb-modal-actions";
+                const cancel = document.createElement("button");
+                cancel.type = "button";
+                cancel.className = "tpb-modal-cancel";
+                cancel.textContent = "Cancel";
+                const ok = document.createElement("button");
+                ok.type = "button";
+                ok.className = "tpb-modal-ok";
+                ok.textContent = "Delete";
+                actions.appendChild(cancel);
+                actions.appendChild(ok);
+                modal.appendChild(p);
+                modal.appendChild(actions);
+                overlay.appendChild(modal);
+                let settled = false;
+                const finish = (val) => {
+                    if (settled) return;
+                    settled = true;
+                    window.removeEventListener("keydown", onKey, true);
+                    overlay.remove();
+                    resolve(val);
+                };
+                const onKey = (e) => {
+                    e.stopPropagation();
+                    if (e.key === "Escape") { e.preventDefault(); finish(false); }
+                    else if (e.key === "Enter") { e.preventDefault(); finish(true); }
+                };
+                cancel.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); finish(false); });
+                ok.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); finish(true); });
+                overlay.addEventListener("pointerdown", (e) => {
+                    e.stopPropagation();
+                    if (e.target === overlay) finish(false);
+                });
+                overlay.addEventListener("mousedown", (e) => e.stopPropagation());
+                window.addEventListener("keydown", onKey, true);
+                document.body.appendChild(overlay);
+                ok.focus();
+            });
             const beginRename = (textEl, onDone) => {
                 if (activeRename) activeRename.close(true);
                 if (!textEl || !textEl.parentNode) return;
@@ -1166,26 +1550,32 @@ app.registerExtension({
                 textEl.style.display = "none";
                 textEl.parentNode.insertBefore(input, textEl.nextSibling);
                 const stop = (e) => e.stopPropagation();
-                input.addEventListener("pointerdown", (e) => {
-                    e.stopPropagation();
-                });
-                input.addEventListener("mousedown", (e) => {
-                    e.stopPropagation();
-                });
-                input.addEventListener("click", stop);
+                input.addEventListener("pointerdown", stop, true);
+                input.addEventListener("mousedown", stop, true);
+                input.addEventListener("mouseup", stop, true);
+                input.addEventListener("click", stop, true);
+                input.addEventListener("dblclick", stop, true);
                 const onKey = (e) => {
-                    if (document.activeElement === input) e.stopPropagation();
+                    if (e.target === input || document.activeElement === input) e.stopPropagation();
                 };
                 window.addEventListener("keydown", onKey, true);
                 window.addEventListener("keyup", onKey, true);
                 let done = false;
-                let focusTimer = 0;
+                const placeCaret = (moveToEnd) => {
+                    if (done || !input.isConnected) return;
+                    input.focus({ preventScroll: true });
+                    if (!moveToEnd) return;
+                    try {
+                        const n = input.value.length;
+                        input.setSelectionRange(n, n);
+                    } catch (_) {}
+                };
                 const close = (commit) => {
                     if (done) return;
                     done = true;
-                    if (focusTimer) clearTimeout(focusTimer);
                     window.removeEventListener("keydown", onKey, true);
                     window.removeEventListener("keyup", onKey, true);
+                    window.removeEventListener("pointerdown", onOutside, true);
                     const name = commit
                         ? (input.value.trim() || textEl.textContent || "Untitled")
                         : textEl.textContent;
@@ -1194,14 +1584,16 @@ app.registerExtension({
                     textEl.textContent = name;
                     if (activeRename && activeRename.close === close) activeRename = null;
                     if (commit) onDone(name);
-                    // Don't leave focus on the Comfy node shell — that paints a
-                    // blue ring and clears the header background.
                     const shell = root.parentElement;
                     requestAnimationFrame(() => {
                         const ae = document.activeElement;
                         if (!ae || ae === document.body || root.contains(ae)) return;
                         if (shell && (ae === shell || shell.contains(ae))) ae.blur();
                     });
+                };
+                const onOutside = (e) => {
+                    if (e.target === input || input.contains(e.target)) return;
+                    close(true);
                 };
                 input.addEventListener("keydown", (e) => {
                     e.stopPropagation();
@@ -1213,16 +1605,20 @@ app.registerExtension({
                         close(false);
                     }
                 });
-                input.addEventListener("blur", () => close(true));
+                // Don't commit on blur. Comfy and dialogs steal focus and that
+                // was closing the field or leaving it with no caret.
+                input.addEventListener("blur", () => {
+                    setTimeout(() => {
+                        if (done || !input.isConnected) return;
+                        if (document.activeElement === input) return;
+                        placeCaret(false);
+                    }, 0);
+                });
                 enableNativeTextMenu(input);
                 activeRename = { close, input };
-                focusTimer = setTimeout(() => {
-                    focusTimer = 0;
-                    if (done || !input.isConnected) return;
-                    input.focus();
-                    const n = input.value.length;
-                    try { input.setSelectionRange(n, n); } catch (_) {}
-                }, 0);
+                placeCaret(true);
+                requestAnimationFrame(() => placeCaret(false));
+                setTimeout(() => window.addEventListener("pointerdown", onOutside, true), 0);
             };
             const syncColorDots = () => {
                 const cat = this._tpb.categories.find((c) => c.id === this._tpb.activeCategoryId);
@@ -1270,10 +1666,14 @@ app.registerExtension({
                     pencil.type = "button";
                     pencil.textContent = "✎";
                     pencil.title = "Rename category";
-                    pencil.addEventListener("click", (e) => {
+                    pencil.addEventListener("pointerdown", (e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         startEdit();
+                    });
+                    pencil.addEventListener("click", (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                     });
                     stopBtn(pencil);
 
@@ -1282,15 +1682,18 @@ app.registerExtension({
                     del.type = "button";
                     del.textContent = "×";
                     del.title = "Delete category";
-                    del.addEventListener("click", (e) => {
+                    del.addEventListener("click", async (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (!confirm(`Delete category "${cat.name}"?`)) return;
+                        if (activeRename) activeRename.close(false);
+                        const ok = await askConfirm(`Delete category "${cat.name}"?`);
+                        if (!ok) return;
                         this._tpb.categories = this._tpb.categories.filter((c) => c.id !== cat.id);
                         if (this._tpb.activeCategoryId === cat.id) {
                             this._tpb.activeCategoryId = this._tpb.categories[0]?.id || null;
                         }
                         renderAll();
+                        persist();
                     });
                     stopBtn(del);
 
@@ -1310,7 +1713,8 @@ app.registerExtension({
                         persist();
                     });
                     row.addEventListener("click", (e) => {
-                        if (e.target.closest(".tpb-del, .tpb-handle, .tpb-pencil")) return;
+                        if (e.target.closest(".tpb-del, .tpb-handle, .tpb-pencil, .tpb-rename-input, input")) return;
+                        if (activeRename) return;
                         this._tpb.activeCategoryId = cat.id;
                         renderCategories();
                         renderItems();
@@ -1360,13 +1764,17 @@ app.registerExtension({
                     pencil.type = "button";
                     pencil.textContent = "✎";
                     pencil.title = "Rename snippet";
-                    pencil.addEventListener("click", (e) => {
+                    pencil.addEventListener("pointerdown", (e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         beginRename(text, (name) => {
                             item.text = name;
                             persist();
                         });
+                    });
+                    pencil.addEventListener("click", (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                     });
                     stopBtn(pencil);
 
@@ -1375,10 +1783,12 @@ app.registerExtension({
                     del.type = "button";
                     del.textContent = "×";
                     del.title = "Delete item";
-                    del.addEventListener("click", (e) => {
+                    del.addEventListener("click", async (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (!confirm(`Remove item "${item.text}"?`)) return;
+                        if (activeRename) activeRename.close(false);
+                        const ok = await askConfirm(`Remove item "${item.text}"?`);
+                        if (!ok) return;
                         cat.items = cat.items.filter((it) => it.id !== item.id);
                         renderItems();
                         persist();
@@ -1400,7 +1810,7 @@ app.registerExtension({
                         persist();
                     });
                     row.addEventListener("click", (e) => {
-                        if (e.target.closest(".tpb-del, .tpb-handle, .tpb-pencil") || text.contentEditable === "true") return;
+                        if (e.target.closest(".tpb-del, .tpb-handle, .tpb-pencil, .tpb-rename-input, input") || activeRename) return;
                         this._tpb.selected.push({
                             id: uid(),
                             text: item.text,
@@ -1491,7 +1901,293 @@ app.registerExtension({
                 el.addEventListener("pointerdown", (e) => e.stopPropagation());
                 el.addEventListener("mousedown", (e) => e.stopPropagation());
             };
-            [addCatBtn, addItemBtn, clearBtn, copyBtn, dbImportBtn, dbExportBtn, clearColorBtn, ...colorDots].forEach(isolate);
+            [addCatBtn, addItemBtn, clearBtn, copyBtn, dbImportBtn, dbExportBtn, clearColorBtn, gearBtn, simpleBtn, enhanceBtn, customBtn, resultCopy, ...colorDots].forEach(isolate);
+            enableNativeTextMenu(resultBox);
+            enableNativeTextMenu(seedInput);
+            const stopSeed = (e) => e.stopPropagation();
+            seedInput.addEventListener("pointerdown", stopSeed);
+            seedInput.addEventListener("mousedown", stopSeed);
+            seedInput.addEventListener("keydown", stopSeed);
+            seedInput.addEventListener("keyup", stopSeed);
+            seedMode.addEventListener("pointerdown", stopSeed);
+            seedMode.addEventListener("mousedown", stopSeed);
+            const readSeed = () => {
+                const n = parseInt(seedInput.value, 10);
+                const seed = Number.isFinite(n) && n >= 0 ? n : 0;
+                this._tpb.textgen.seed = seed;
+                this._tpb.textgen.seedMode = seedMode.value || "fixed";
+                return seed;
+            };
+            seedInput.addEventListener("change", () => { readSeed(); persist(); });
+            seedInput.addEventListener("input", () => { readSeed(); });
+            seedMode.addEventListener("change", () => { readSeed(); persist(); });
+
+            const tpbApi = async (path, options) => {
+                if (app.api?.fetchApi) {
+                    try {
+                        const res = await app.api.fetchApi(path, options);
+                        if (res.status !== 404) return res;
+                    } catch (_) {}
+                }
+                return fetch(path, options);
+            };
+
+            const setAssembled = (text, isError) => {
+                this._tpb.assembled = isError ? this._tpb.assembled : text;
+                resultBox.classList.toggle("error", !!isError);
+                resultBox.value = text;
+                const w = getWidget(this, "assembled_prompt");
+                if (w && !isError) w.value = text;
+            };
+
+            const runAssemble = async (mode) => {
+                readSeed();
+                const tg = this._tpb.textgen || defaultTextgen();
+                const system = mode === "enhance" ? tg.systemEnhance : mode === "custom" ? tg.systemCustom : tg.systemAssemble;
+                const prompt = getWidget(this, "composed_prompt")?.value || "";
+                if (!tg.model) {
+                    setAssembled("Choose a text model with the gear.", true);
+                    return;
+                }
+                if (mode === "custom" && !(system || "").trim()) {
+                    setAssembled("Add a custom system prompt in the gear settings.", true);
+                    return;
+                }
+                if (!prompt.trim()) {
+                    setAssembled("Add snippets before assembling.", true);
+                    return;
+                }
+                const buttons = [simpleBtn, enhanceBtn, customBtn];
+                buttons.forEach((b) => { b.disabled = true; });
+                simpleBtn.classList.toggle("active", mode === "simple");
+                enhanceBtn.classList.toggle("active", mode === "enhance");
+                customBtn.classList.toggle("active", mode === "custom");
+                resultBox.classList.remove("error");
+                resultBox.value = "Generating…";
+                try {
+                    const res = await tpbApi("/tallron/prompt-builder/generate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            model: tg.model,
+                            type: tg.type,
+                            prompt,
+                            system_prompt: system || "",
+                            settings: tg,
+                        }),
+                    });
+                    let data = {};
+                    try { data = await res.json(); } catch (_) {}
+                    if (!res.ok || data.error) {
+                        setAssembled(data.error || ("Generate failed (" + res.status + ")"), true);
+                        return;
+                    }
+                    setAssembled(data.text || "", false);
+                    const modeName = this._tpb.textgen.seedMode || "fixed";
+                    let nextSeed = Number(this._tpb.textgen.seed) || 0;
+                    if (modeName === "increment") nextSeed += 1;
+                    else if (modeName === "decrement") nextSeed = Math.max(0, nextSeed - 1);
+                    else if (modeName === "randomize") nextSeed = Math.floor(Math.random() * 2147483647);
+                    if (modeName !== "fixed") {
+                        this._tpb.textgen.seed = nextSeed;
+                        seedInput.value = String(nextSeed);
+                        persist();
+                    }
+                } catch (err) {
+                    setAssembled(err?.message || "Generate failed.", true);
+                } finally {
+                    buttons.forEach((b) => { b.disabled = false; });
+                }
+            };
+            simpleBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); runAssemble("simple"); });
+            enhanceBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); runAssemble("enhance"); });
+            customBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); runAssemble("custom"); });
+
+            const openSettings = async () => {
+                const tg = this._tpb.textgen || (this._tpb.textgen = defaultTextgen());
+                const overlay = document.createElement("div");
+                overlay.className = "tpb-modal-overlay";
+                const modal = document.createElement("div");
+                modal.className = "tpb-modal tpb-settings";
+                const title = document.createElement("h3");
+                title.textContent = "Text Generate";
+                modal.appendChild(title);
+
+                const addField = (labelText, el) => {
+                    const label = document.createElement("label");
+                    label.appendChild(document.createTextNode(labelText));
+                    label.appendChild(el);
+                    return label;
+                };
+                const modelSel = document.createElement("select");
+                const typeSel = document.createElement("select");
+                const fillSelect = (sel, options, current, placeholder) => {
+                    sel.innerHTML = "";
+                    if (placeholder) {
+                        const opt = document.createElement("option");
+                        opt.value = "";
+                        opt.textContent = placeholder;
+                        sel.appendChild(opt);
+                    }
+                    for (const name of options) {
+                        const opt = document.createElement("option");
+                        opt.value = name;
+                        opt.textContent = name;
+                        sel.appendChild(opt);
+                    }
+                    if (current && ![...sel.options].some((o) => o.value === current)) {
+                        const opt = document.createElement("option");
+                        opt.value = current;
+                        opt.textContent = current;
+                        sel.appendChild(opt);
+                    }
+                    sel.value = current || "";
+                };
+                fillSelect(modelSel, tg.model ? [tg.model] : [], tg.model, "Loading models…");
+                fillSelect(typeSel, ["qwen_image"], tg.type);
+                modal.appendChild(addField("Text model", modelSel));
+                modal.appendChild(addField("Encoder type", typeSel));
+
+                const grid = document.createElement("div");
+                grid.className = "tpb-settings-grid";
+                const num = (value, step) => {
+                    const input = document.createElement("input");
+                    input.type = "number";
+                    input.step = step || "1";
+                    input.value = value;
+                    return input;
+                };
+                const maxLen = num(tg.max_length);
+                const temperature = num(tg.temperature, "0.01");
+                const topK = num(tg.top_k);
+                const topP = num(tg.top_p, "0.01");
+                const minP = num(tg.min_p, "0.01");
+                const rep = num(tg.repetition_penalty, "0.01");
+                const presence = num(tg.presence_penalty, "0.01");
+                const seed = num(tg.seed);
+                const sampling = document.createElement("select");
+                fillSelect(sampling, ["on", "off"], tg.sampling_mode || "on");
+                const mtp = document.createElement("select");
+                fillSelect(mtp, ["auto", "off", "2", "3", "4", "5"], tg.mtp || "auto");
+                const thinking = document.createElement("input");
+                thinking.type = "checkbox";
+                thinking.checked = !!tg.thinking;
+                grid.appendChild(addField("Max length", maxLen));
+                grid.appendChild(addField("Sampling", sampling));
+                grid.appendChild(addField("Temperature", temperature));
+                grid.appendChild(addField("Top K", topK));
+                grid.appendChild(addField("Top P", topP));
+                grid.appendChild(addField("Min P", minP));
+                grid.appendChild(addField("Repetition penalty", rep));
+                grid.appendChild(addField("Presence penalty", presence));
+                grid.appendChild(addField("Seed", seed));
+                grid.appendChild(addField("MTP", mtp));
+                const thinkLabel = addField("Thinking", thinking);
+                thinkLabel.style.flexDirection = "row";
+                thinkLabel.style.alignItems = "center";
+                thinkLabel.style.gap = "8px";
+                grid.appendChild(thinkLabel);
+                modal.appendChild(grid);
+
+                const sys = (heading, value) => {
+                    const h = document.createElement("h4");
+                    h.textContent = heading;
+                    const ta = document.createElement("textarea");
+                    ta.value = value || "";
+                    modal.appendChild(h);
+                    modal.appendChild(ta);
+                    return ta;
+                };
+                const assembleTa = sys("Simple — assemble into a prompt", tg.systemAssemble);
+                const enhanceTa = sys("Enhance", tg.systemEnhance);
+                const customTa = sys("Custom system prompt", tg.systemCustom);
+
+                const actions = document.createElement("div");
+                actions.className = "tpb-modal-actions";
+                const cancel = document.createElement("button");
+                cancel.type = "button";
+                cancel.className = "tpb-modal-cancel";
+                cancel.textContent = "Cancel";
+                const save = document.createElement("button");
+                save.type = "button";
+                save.className = "tpb-modal-ok";
+                save.textContent = "Save";
+                actions.appendChild(cancel);
+                actions.appendChild(save);
+                modal.appendChild(actions);
+                overlay.appendChild(modal);
+                document.body.appendChild(overlay);
+
+                const onKey = (e) => {
+                    if (overlay.contains(document.activeElement)) e.stopPropagation();
+                };
+                window.addEventListener("keydown", onKey, true);
+                window.addEventListener("keyup", onKey, true);
+                const close = () => {
+                    window.removeEventListener("keydown", onKey, true);
+                    window.removeEventListener("keyup", onKey, true);
+                    overlay.remove();
+                };
+                cancel.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); close(); });
+                overlay.addEventListener("pointerdown", (e) => e.stopPropagation());
+                overlay.addEventListener("mousedown", (e) => e.stopPropagation());
+                [modelSel, typeSel, maxLen, temperature, topK, topP, minP, rep, presence, seed, sampling, mtp, thinking, assembleTa, enhanceTa, customTa, cancel, save].forEach((el) => {
+                    el.addEventListener("pointerdown", (e) => e.stopPropagation());
+                    el.addEventListener("mousedown", (e) => e.stopPropagation());
+                    el.addEventListener("keydown", (e) => e.stopPropagation());
+                    enableNativeTextMenu(el);
+                });
+                save.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const n = (el, fallback) => {
+                        const v = parseFloat(el.value);
+                        return Number.isFinite(v) ? v : fallback;
+                    };
+                    this._tpb.textgen = Object.assign(defaultTextgen(), tg, {
+                        model: modelSel.value,
+                        type: typeSel.value || "qwen_image",
+                        max_length: n(maxLen, 512),
+                        sampling_mode: sampling.value,
+                        temperature: n(temperature, 0.7),
+                        top_k: n(topK, 64),
+                        top_p: n(topP, 0.95),
+                        min_p: n(minP, 0.05),
+                        repetition_penalty: n(rep, 1.05),
+                        presence_penalty: n(presence, 0),
+                        seed: n(seed, 0),
+                        seedMode: seedMode.value || this._tpb.textgen.seedMode || "fixed",
+                        mtp: mtp.value || "auto",
+                        thinking: thinking.checked,
+                        systemAssemble: assembleTa.value,
+                        systemEnhance: enhanceTa.value,
+                        systemCustom: customTa.value,
+                    });
+                    persist();
+                    seedInput.value = String(this._tpb.textgen.seed ?? 0);
+                    close();
+                });
+
+                try {
+                    const res = await tpbApi("/tallron/prompt-builder/models");
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (overlay.isConnected) {
+                            fillSelect(modelSel, data.models || [], tg.model, data.models?.length ? "Select a model" : "No text encoders found");
+                            fillSelect(typeSel, data.types || ["qwen_image"], tg.type || "qwen_image");
+                        }
+                    } else if (overlay.isConnected) {
+                        fillSelect(modelSel, tg.model ? [tg.model] : [], tg.model, "Could not list models");
+                    }
+                } catch (_) {
+                    if (overlay.isConnected) fillSelect(modelSel, tg.model ? [tg.model] : [], tg.model, "Could not list models");
+                }
+            };
+            gearBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openSettings();
+            });
             root.addEventListener("pointerdown", (e) => e.stopPropagation());
             root.addEventListener("mousedown", (e) => e.stopPropagation());
             // Keep focus inside the widget so Comfy doesn't draw a blue node
@@ -1629,6 +2325,21 @@ app.registerExtension({
                 updateOutput();
             });
 
+            resultCopy.addEventListener("click", async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const text = resultBox.value || "";
+                if (!text.trim() || resultBox.classList.contains("error") || text === "Generating…") return;
+                try {
+                    await navigator.clipboard.writeText(text);
+                    const prev = resultCopy.textContent;
+                    resultCopy.textContent = "Copied";
+                    setTimeout(() => { resultCopy.textContent = prev; }, 900);
+                } catch (_) {
+                    window.prompt("Copy generated prompt:", text);
+                }
+            });
+
             copyBtn.addEventListener("click", async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1702,7 +2413,7 @@ app.registerExtension({
             renderAll();
 
             // Size — fixed so lists scroll instead of growing the node
-            this.setSize?.([NODE_WIDTH, 460]);
+            this.setSize?.([NODE_WIDTH, 620]);
             const initialW = Math.max(120, (this.size?.[0] || NODE_WIDTH) - 24);
             root.style.width = initialW + "px";
             root.style.maxWidth = initialW + "px";
@@ -1720,19 +2431,27 @@ app.registerExtension({
                         if (Array.isArray(data.categories)) this._tpb.categories = data.categories;
                         if (data.activeCategoryId) this._tpb.activeCategoryId = data.activeCategoryId;
                         if (Array.isArray(data.selected)) this._tpb.selected = data.selected;
+                        if (data.textgen && typeof data.textgen === "object") {
+                            this._tpb.textgen = Object.assign(defaultTextgen(), data.textgen);
+                        }
+                        const assembled = getWidget(this, "assembled_prompt");
+                        if (assembled && typeof assembled.value === "string") {
+                            this._tpb.assembled = assembled.value;
+                            resultBox.value = assembled.value;
+                        }
                         renderAll();
                     } catch (_) {}
                 }
             };
         };
 
-        // Resize fills the lists using a measured chrome offset so the handle
-        // cannot feedback-grow the node (widget height = node height - chrome).
+        // Fill the node. Chrome is only the title/padding, not the empty gap
+        // under a short widget (that gap was being saved as chrome).
         const origOnResize = nodeType.prototype.onResize;
         nodeType.prototype.onResize = function (size) {
             origOnResize?.apply(this, arguments);
             const t = this._tpb;
-            if (!t || t._syncing || !size || !size[0] || !size[1] || !t.lockedH || !t.root) return;
+            if (!t || t._syncing || !size || !size[0] || !size[1] || !t.root) return;
 
             const inner = Math.max(120, Math.round(size[0] - 24));
             t.root.style.width = inner + "px";
@@ -1742,21 +2461,27 @@ app.registerExtension({
             t.root.style.boxSizing = "border-box";
             if (typeof t.fitWidth === "function") t.fitWidth();
 
-            if (t.chrome == null) {
-                t.chrome = Math.max(0, size[1] - t.lockedH);
-                t.lastNodeH = size[1];
-                return;
+            if (t.chrome == null || t.chrome > 120) {
+                let chrome = 36;
+                const nodeEl = t.root.closest(".lg-node, .comfy-vue-node, .graphnode, [data-id]");
+                if (nodeEl && nodeEl.clientHeight > 40 && nodeEl.contains(t.root)) {
+                    const scale = (nodeEl.getBoundingClientRect().height / nodeEl.offsetHeight) || 1;
+                    const topInset = (t.root.getBoundingClientRect().top - nodeEl.getBoundingClientRect().top) / scale;
+                    if (topInset > 0 && topInset < 160) chrome = Math.round(topInset + 8);
+                }
+                t.chrome = chrome;
             }
-            if (Math.abs(size[1] - t.lastNodeH) < 1) return;
-            const widgetH = Math.max(300, Math.round(size[1] - t.chrome));
+            const widgetH = Math.max(160, Math.round(size[1] - t.chrome));
             t.lastNodeH = size[1];
-            if (Math.abs(widgetH - t.lockedH) < 1) return;
-            t._syncing = true;
             t.lockedH = widgetH;
             t.root.style.height = widgetH + "px";
             t.root.style.maxHeight = widgetH + "px";
-            if (t.domWidget) t.domWidget.computedHeight = widgetH;
-            t._syncing = false;
+            t.root.style.minHeight = "0";
+            const wrap = t.root.parentElement;
+            if (wrap) {
+                wrap.style.minHeight = "0";
+                wrap.style.overflow = "hidden";
+            }
         };
     },
 });
