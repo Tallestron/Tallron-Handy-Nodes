@@ -26,6 +26,7 @@ _load(".LoadImageDownsizer.node_load_image_downsizer", "Advanced Image Loader")
 _load(".ReferenceImageLoader.node_reference_image_loader", "Reference Image Loader")
 _load(".NoteList.node_note_list", "Note List")
 _load(".PromptVault.node_prompt_vault", "Prompt Vault")
+_load(".PromptBuilder.node_prompt_builder", "Prompt Builder")
 _load(".ImageCompare.node_image_compare", "Image Compare")
 
 WEB_DIRECTORY = "./js"

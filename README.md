@@ -11,6 +11,7 @@ Utility nodes for ComfyUI. All nodes appear under the **Tallron Handy Nodes** ca
 | **MP Resolution Selector** | On-node resolution picker calibrated to megapixel targets / model profiles |
 | **Note List** | Reorderable notes with expand/collapse, click → STRING, copy, import/export |
 | **Prompt Vault** | Categorized prompts with 1024×1024 images, resizable preview, Copy → STRING |
+| **Prompt Builder** | Three-panel composer: categories, items, selected snippets → STRING |
 | **Image Compare** | Side-by-side / overlay / difference viewer for two images |
 
 ---
@@ -56,6 +57,34 @@ Utility nodes for ComfyUI. All nodes appear under the **Tallron Handy Nodes** ca
 - Click the preview to open a full-size lightbox; **Clear** removes the image
 - Reorder, delete with confirm; import / export JSON (categories + images included)
 
+### Prompt Builder
+
+- **Left panel**: categories (green **+ Category** button)
+- Left header is the green **+ Category** button (no title text)
+- Right header is the blue **+Snippet** button — opens the list-import dialog
+- **Copy Prompt** (blue) and **Clear Prompt** (red) sit centered under the snippet list
+- Pencil (✎) on a category or snippet renames it
+- Drag chips in the bottom snippet window to reorder the prompt
+- Lists scroll inside a fixed-height node; resizing the node updates that height
+- Click an item to append it to the bottom **Selected snippets**
+- Color dots along the top set a rectangular tag color on the selected category
+- Dark gray **×** dot clears the selected category's color
+- Snippets from categories that share a tag color are joined with a space; different colors (or no color) use a comma
+- **+ Category** adds a category and immediately lets you type its name in the list
+- Left pane width follows the widest category name
+- Resizing the node taller grows the lists; shorter keeps them scrolling
+- Bottom panel shows removable chips; STRING output is the composed text
+- **Clear Prompt** button (red, centered below the snippet list)
+- Drag the ⋮⋮ handle to reorder categories or items
+- × on an item asks for confirmation before deleting
+- Mouse wheel over a list scrolls that list (does not zoom the canvas)
+- **Import / Export** (bottom): full database JSON backup (categories + items + colors + selected). Import can replace or merge
+- Double-click category or item names to rename
+- Lists scroll instead of growing the node
+- Pre-populated with useful categories: Setting, Lighting, People, Hair Styles, Ethnicity, Street Clothing, Lingerie, Swimsuit
+- Street Clothing, Lingerie, and Swimsuit share a yellow tag by default (space-joined)
+- State is saved with the workflow
+
 ### Image Compare
 
 - Optional `image1` / `image2` inputs (no hard error if one is missing)
@@ -84,12 +113,14 @@ Tallron-Handy-Nodes/
 │   ├── mp_resolution.js
 │   ├── note_list.js
 │   ├── prompt_vault.js
+│   ├── prompt_builder.js
 │   └── image_compare.js
 ├── LoadImageDownsizer/
 ├── ReferenceImageLoader/
 ├── MP_Resolution/
 ├── NoteList/
 ├── PromptVault/
+├── PromptBuilder/
 └── ImageCompare/
 ```
 
