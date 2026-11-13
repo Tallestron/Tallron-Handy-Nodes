@@ -2,13 +2,16 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
 const NODE_NAME = "TallronReferenceImageLoader";
-const MAX_SLOTS = 10;
+const MAX_SLOTS = 16;
+const ORIG_SLOT = 0;
+const BATCH_SLOT = 1;
+const IMAGE_SLOT0 = 2;
 const CROP_PROP = "ril_crop";
 const HIDDEN_INPUT_NAME = "crop";
 const CSS_ID = "tallron-ref-loader-crop-css";
 
 const NODE_WIDTH = 440;
-const CONTROLS_HEIGHT = 130;
+const CONTROLS_HEIGHT = 70;
 const GRID_PAD = 12;
 const GAP = 8;
 const MIN_CELL = 90;
@@ -504,14 +507,57 @@ app.registerExtension({
       return node.widgets?.find((w) => w.name === name);
     }
 
-    function isFluxStyle(node) {
+    function isZeroBased(node) {
       const w = getWidget(node, "index_style");
       const v = (w?.value || "").toString();
-      return v.startsWith("Flux");
+      return v.startsWith("0");
+    }
+
+    function setOutputName(output, name) {
+      if (!output) return;
+      output.name = name;
+      if (output.localized_name !== undefined) output.localized_name = name;
+    }
+
+    function slotTitle(output) {
+      return `${output?.name || ""} ${output?.localized_name || ""}`.toLowerCase();
+    }
+
+    function isLegacyOutputOrder(outputs) {
+      if (!outputs || outputs.length < MAX_SLOTS + 2) return false;
+      if (slotTitle(outputs[0]).includes("orig")) return false;
+      return (
+        slotTitle(outputs[MAX_SLOTS]).includes("batch") &&
+        slotTitle(outputs[MAX_SLOTS + 1]).includes("orig")
+      );
+    }
+
+    function imageOutputName(node, zeroBasedIndex) {
+      const n = isZeroBased(node) ? zeroBasedIndex : zeroBasedIndex + 1;
+      return `Image ${n}`;
+    }
+
+    function nameOutputs(node) {
+      const outs = node.outputs;
+      if (!outs || outs.length < 2) return;
+      const zero = isZeroBased(node);
+      setOutputName(outs[ORIG_SLOT], zero ? "Image 0 orig size" : "Image 1 orig size");
+      setOutputName(outs[BATCH_SLOT], "full batch");
+      for (let i = 0; i + IMAGE_SLOT0 < outs.length && i < MAX_SLOTS; i++) {
+        setOutputName(outs[IMAGE_SLOT0 + i], imageOutputName(node, i));
+      }
+    }
+
+    function getLayoutWidth(node) {
+      const w = getWidget(node, "layout_width");
+      let n = parseInt(w?.value, 10);
+      if (isNaN(n) || n < 2) n = 2;
+      if (n > 4) n = 4;
+      return n;
     }
 
     function slotLabel(node, zeroBasedIndex) {
-      const n = isFluxStyle(node) ? zeroBasedIndex : zeroBasedIndex + 1;
+      const n = isZeroBased(node) ? zeroBasedIndex : zeroBasedIndex + 1;
       return `Image ${n}`;
     }
 
@@ -558,11 +604,12 @@ app.registerExtension({
       return data.name || data.filename || file.name;
     }
 
-    function computeNodeSize(numSlots, currentWidth) {
+    function computeNodeSize(numSlots, currentWidth, cols) {
       const n = Math.max(1, Math.min(MAX_SLOTS, numSlots | 0));
-      const rows = Math.ceil(n / 2);
+      const c = Math.max(2, Math.min(4, cols | 0 || 2));
+      const rows = Math.ceil(n / c);
       const w = currentWidth && currentWidth > 200 ? currentWidth : NODE_WIDTH;
-      let cell = Math.floor((w - GRID_PAD * 2 - GAP) / 2);
+      let cell = Math.floor((w - GRID_PAD * 2 - GAP * (c - 1)) / c);
       cell = Math.max(MIN_CELL, Math.min(MAX_CELL, cell));
       const gridH = rows * cell + (rows - 1) * GAP + GRID_PAD * 2;
       return [w, CONTROLS_HEIGHT + gridH];
@@ -585,9 +632,12 @@ app.registerExtension({
       injectCropCSS();
       this._hideJsonWidget();
       this._hideCropWidget();
+      this._hideSettingsWidgets();
+      this._placeGearBesideSlots();
       this._buildGrid();
 
       const numW = getWidget(this, "num_slots");
+      if (numW) numW.label = "Number of Slots";
       const n = numW ? parseInt(numW.value, 10) || 10 : 10;
       this._activeCount = n;
       this._resizeToSlots(n, true);
@@ -595,6 +645,14 @@ app.registerExtension({
       this._applyIndexStyle();
       this._syncAllPreviews();
       this._updateAllCropBtnStates();
+      this._syncOutputs();
+
+      const origConnect = this.onConnectionsChange;
+      this.onConnectionsChange = function () {
+        const r = origConnect?.apply(this, arguments);
+        this._syncOutputs();
+        return r;
+      };
 
       if (numW) {
         const origCb = numW.callback;
@@ -636,17 +694,24 @@ app.registerExtension({
       const origOnConfigure = this.onConfigure;
       this.onConfigure = function (info) {
         const r3 = origOnConfigure?.apply(this, arguments);
+        this._migrateOutputOrder(info);
+        this._syncOutputs();
         setTimeout(() => {
           this._hideJsonWidget();
           this._hideCropWidget();
+          this._hideSettingsWidgets();
           const numW2 = getWidget(this, "num_slots");
+          if (numW2) numW2.label = "Number of Slots";
+          this._placeGearBesideSlots();
           const n2 = numW2 ? parseInt(numW2.value, 10) || 10 : 10;
           this._activeCount = n2;
           this._applySlotCount(false);
           this._resizeToSlots(n2, true);
           this._applyIndexStyle();
+          this._applyLayoutWidth();
           this._syncAllPreviews();
           this._updateAllCropBtnStates();
+          this._syncOutputs();
         }, 40);
         return r3;
       };
@@ -654,13 +719,18 @@ app.registerExtension({
       setTimeout(() => {
         this._hideJsonWidget();
         this._hideCropWidget();
+        this._hideSettingsWidgets();
         const numW3 = getWidget(this, "num_slots");
+        if (numW3) numW3.label = "Number of Slots";
+        this._placeGearBesideSlots();
         const n3 = numW3 ? parseInt(numW3.value, 10) || 10 : 10;
         this._resizeToSlots(n3, true);
         this._applySlotCount(false);
         this._applyIndexStyle();
+        this._applyLayoutWidth();
         this._syncAllPreviews();
         this._updateAllCropBtnStates();
+        this._syncOutputs();
       }, 80);
 
       return r;
@@ -677,40 +747,25 @@ app.registerExtension({
     };
 
     nodeType.prototype._applyIndexStyle = function () {
-      const flux = isFluxStyle(this);
       for (let i = 0; i < MAX_SLOTS; i++) {
         const labelEl = this._slotLabels[i];
         if (labelEl) labelEl.textContent = slotLabel(this, i);
       }
-      if (this.outputs && this.outputs.length >= 10) {
-        for (let i = 0; i < 10; i++) {
-          const name = flux ? `Image ${i}` : `Image ${i + 1}`;
-          this.outputs[i].name = name;
-          if (this.outputs[i].localized_name !== undefined) {
-            this.outputs[i].localized_name = name;
-          }
-        }
-        if (this.outputs.length >= 12) {
-          const fullName = flux ? "Image 0 full size" : "Image 1 full size";
-          this.outputs[11].name = fullName;
-          if (this.outputs[11].localized_name !== undefined) {
-            this.outputs[11].localized_name = fullName;
-          }
-        }
-      }
+      nameOutputs(this);
       this.setDirtyCanvas?.(true, true);
     };
 
     nodeType.prototype._resizeToSlots = function (numSlots, force) {
       const n = Math.max(1, Math.min(MAX_SLOTS, numSlots | 0));
+      const cols = getLayoutWidth(this);
       const width = this.size?.[0] || NODE_WIDTH;
-      const [w, h] = computeNodeSize(n, width);
+      const [w, h] = computeNodeSize(n, width, cols);
 
       this._autoSizing = true;
       try {
         if (this._gridWidget) {
-          const rows = Math.ceil(n / 2);
-          let cell = Math.floor((w - GRID_PAD * 2 - GAP) / 2);
+          const rows = Math.ceil(n / cols);
+          let cell = Math.floor((w - GRID_PAD * 2 - GAP * (cols - 1)) / cols);
           cell = Math.max(MIN_CELL, Math.min(MAX_CELL, cell));
           const gridH = rows * cell + (rows - 1) * GAP + GRID_PAD * 2;
           this._gridWidget.computedHeight = gridH;
@@ -723,8 +778,364 @@ app.registerExtension({
       } finally {
         this._autoSizing = false;
       }
+      this._applyLayoutWidth();
       this._updateGridSize();
       this.setDirtyCanvas?.(true, true);
+    };
+
+    nodeType.prototype._applyLayoutWidth = function () {
+      const cols = getLayoutWidth(this);
+      if (this._gridContainer) {
+        this._gridContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+      }
+    };
+
+    nodeType.prototype._hideSettingsWidgets = function () {
+      const names = ["index_style", "megapixels", "upscale_method", "fit_mode", "batch_longest", "layout_width", "multiple"];
+      for (const name of names) {
+        const w = getWidget(this, name);
+        if (!w) continue;
+        w.computeSize = () => [0, -4];
+        w.computedHeight = 0;
+        w.hidden = true;
+        w.draw = () => {};
+        const els = [w.element, w.inputEl, w.span, w.div, w.dom];
+        for (const el of els) {
+          if (el?.style) {
+            el.style.display = "none";
+            el.style.height = "0";
+          }
+        }
+      }
+    };
+
+    nodeType.prototype._openSettings = function () {
+      const node = this;
+      const overlay = document.createElement("div");
+      overlay.style.cssText = "position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;font-family:ui-sans-serif,system-ui,sans-serif;";
+      const dialog = document.createElement("div");
+      dialog.style.cssText = "background:#2a2a2a;border:1px solid #555;border-radius:10px;padding:16px;min-width:340px;max-width:460px;color:#eee;max-height:80vh;overflow:auto;";
+      dialog.innerHTML = `<h3 style="margin:0 0 12px;font-size:15px;">Reference Loader Settings</h3>`;
+
+      const groups = [
+        { title: "Layout", fields: [
+          { name: "layout_width", label: "Layout width", type: "select", options: ["2", "3", "4"] },
+          { name: "index_style", label: "Index style", type: "select", options: ["1-based", "0-based"] },
+        ]},
+        { title: "Image scale", fields: [
+          { name: "megapixels", label: "Megapixels (individual)", type: "number", min: 0, max: 16, step: 0.05 },
+          { name: "upscale_method", label: "Upscale method", type: "select", options: ["lanczos", "nearest", "bilinear", "bicubic", "area", "nearest-exact"] },
+          { name: "fit_mode", label: "Fit mode", type: "select", options: ["keep_aspect", "crop", "stretch", "pad"] },
+          { name: "multiple", label: "Multiple", type: "select", options: ["8", "16", "32", "64"] },
+        ]},
+        { title: "Batch", fields: [
+          { name: "batch_longest", label: "Longest side (px, 0=off)", type: "number", min: 0, max: 8192, step: 64 },
+        ]},
+      ];
+
+      const inputs = {};
+      for (const g of groups) {
+        const div = document.createElement("div");
+        div.style.cssText = "border-top:1px solid #444;margin:10px 0 6px;padding-top:8px;font-size:11px;color:#8ab;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;";
+        div.textContent = g.title;
+        dialog.appendChild(div);
+        for (const f of g.fields) {
+          const row = document.createElement("div");
+          row.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin:6px 0;gap:10px;";
+          const lab = document.createElement("label");
+          lab.textContent = f.label;
+          lab.style.cssText = "font-size:12px;flex:1;";
+          let el;
+          if (f.type === "select") {
+            el = document.createElement("select");
+            el.style.cssText = "background:#1a1a1a;color:#eee;border:1px solid #555;border-radius:4px;padding:4px 8px;";
+            for (const opt of f.options) {
+              const o = document.createElement("option");
+              o.value = opt;
+              o.textContent = opt;
+              el.appendChild(o);
+            }
+          } else {
+            el = document.createElement("input");
+            el.type = "number";
+            el.min = f.min;
+            el.max = f.max;
+            el.step = f.step;
+            el.style.cssText = "width:100px;background:#1a1a1a;color:#eee;border:1px solid #555;border-radius:4px;padding:4px 8px;";
+          }
+          const w = getWidget(node, f.name);
+          if (w) el.value = w.value;
+          inputs[f.name] = el;
+          row.append(lab, el);
+          dialog.appendChild(row);
+        }
+      }
+
+      const btnRow = document.createElement("div");
+      btnRow.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:14px;border-top:1px solid #444;padding-top:12px;";
+      const cancel = document.createElement("button");
+      cancel.textContent = "Cancel";
+      cancel.style.cssText = "background:#3a3a3a;color:#eee;border:1px solid #666;border-radius:6px;padding:6px 14px;cursor:pointer;";
+      const apply = document.createElement("button");
+      apply.textContent = "Apply";
+      apply.style.cssText = "background:#3d6eb5;color:#fff;border:1px solid #5BA3F5;border-radius:6px;padding:6px 14px;cursor:pointer;";
+      cancel.onclick = () => overlay.remove();
+      apply.onclick = () => {
+        for (const g of groups) {
+          for (const f of g.fields) {
+            const w = getWidget(node, f.name);
+            if (!w) continue;
+            let v = inputs[f.name].value;
+            if (f.type === "number") v = f.name === "megapixels" ? parseFloat(v) : parseInt(v, 10);
+            w.value = v;
+            if (w.callback) w.callback(v, app.canvas, node);
+          }
+        }
+        node._applyIndexStyle();
+        node._applyLayoutWidth();
+        node._applySlotCount(true);
+        node._syncOutputs();
+        node.setDirtyCanvas?.(true, true);
+        overlay.remove();
+      };
+      btnRow.append(cancel, apply);
+      dialog.appendChild(btnRow);
+      overlay.appendChild(dialog);
+      overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) overlay.remove(); });
+      document.body.appendChild(overlay);
+    };
+
+    nodeType.prototype._placeGearBesideSlots = function () {
+      const numW = getWidget(this, "num_slots");
+      if (numW) numW.label = "Number of Slots";
+
+      if (this._gearWidget) return;
+
+      const gear = this.addWidget("button", "⚙ Settings", null, () => {
+        this._openSettings();
+      });
+      gear.serialize = false;
+      this._gearWidget = gear;
+
+      // Place the button immediately after Number of Slots
+      if (this.widgets && numW) {
+        const from = this.widgets.indexOf(gear);
+        const to = this.widgets.indexOf(numW);
+        if (from > -1 && to > -1 && from !== to + 1) {
+          this.widgets.splice(from, 1);
+          this.widgets.splice(to + 1, 0, gear);
+        }
+      }
+    };
+
+    nodeType.prototype._migrateOutputOrder = function (savedInfo) {
+      if (this._rilOrderMigrated && savedInfo == null) return;
+      const saved = savedInfo?.outputs;
+      const savedOld = isLegacyOutputOrder(saved);
+      const liveOld = isLegacyOutputOrder(this.outputs);
+      if (!savedOld && !liveOld) {
+        if (savedInfo || slotTitle(this.outputs?.[0]).includes("orig")) {
+          this._rilOrderMigrated = true;
+        }
+        return;
+      }
+      if (liveOld) {
+        const live = this.outputs;
+        this.outputs = [live[MAX_SLOTS + 1], live[MAX_SLOTS], ...live.slice(0, MAX_SLOTS)];
+      } else if (savedOld && this.outputs && this.outputs.length >= MAX_SLOTS + 2) {
+        const assign = (newIdx, oldIdx) => {
+          const dst = this.outputs[newIdx];
+          if (!dst) return;
+          const srcLinks = saved[oldIdx]?.links;
+          dst.links = srcLinks
+            ? Array.isArray(srcLinks)
+              ? srcLinks.slice()
+              : Array.from(srcLinks)
+            : null;
+        };
+        assign(ORIG_SLOT, MAX_SLOTS + 1);
+        assign(BATCH_SLOT, MAX_SLOTS);
+        for (let i = 0; i < MAX_SLOTS; i++) assign(IMAGE_SLOT0 + i, i);
+      }
+      for (let i = 0; i < this.outputs.length; i++) {
+        if (this.outputs[i]) this.outputs[i].slot_index = i;
+      }
+      this._rilOrderMigrated = true;
+      this._rilNeedsLinkFix = true;
+      this._fixLinkSlots();
+    };
+
+    nodeType.prototype._fixLinkSlots = function () {
+      if (!this._rilNeedsLinkFix || !this.outputs || !this.graph?.links) return;
+      const links = this.graph.links;
+      const slotByLinkId = new Map();
+      const ourIds = [];
+      for (let i = 0; i < this.outputs.length; i++) {
+        const ls = this.outputs[i]?.links;
+        if (!ls) continue;
+        for (const id of ls) {
+          slotByLinkId.set(Number(id), i);
+          slotByLinkId.set(String(id), i);
+          ourIds.push(Number(id));
+        }
+      }
+      const found = new Set();
+      const visit = (link) => {
+        if (!link) return;
+        const origin = Array.isArray(link) ? link[1] : link.origin_id ?? link.originId;
+        if (String(origin) !== String(this.id)) return;
+        const rawId = Array.isArray(link) ? link[0] : link.id;
+        const slot = slotByLinkId.has(Number(rawId))
+          ? slotByLinkId.get(Number(rawId))
+          : slotByLinkId.get(String(rawId));
+        if (slot === undefined) return;
+        if (Array.isArray(link)) link[2] = slot;
+        else link.origin_slot = slot;
+        found.add(Number(rawId));
+      };
+      if (typeof links.forEach === "function" && !Array.isArray(links)) links.forEach(visit);
+      else if (typeof links.values === "function") {
+        for (const link of links.values()) visit(link);
+      } else if (Array.isArray(links)) {
+        for (const link of links) visit(link);
+      } else {
+        for (const key of Object.keys(links)) visit(links[key]);
+      }
+      if (!ourIds.length || ourIds.every((id) => found.has(id))) this._rilNeedsLinkFix = false;
+    };
+
+    nodeType.prototype._syncOutputs = function () {
+      if (this._rilSyncing) return;
+      if (!this.outputs || this.outputs.length < 2) return;
+      this._rilSyncing = true;
+      try {
+        if (!this._rilOrderMigrated) this._migrateOutputOrder(null);
+        this._fixLinkSlots();
+
+        // Image 1 and 2 always. The next image socket appears only after the
+        // previous one is connected. Slot count does not reveal outputs.
+        // The new UI ignores output.hidden, so extra sockets are removed.
+        let lastImage = 1;
+        const present = Math.min(MAX_SLOTS, Math.max(0, this.outputs.length - IMAGE_SLOT0));
+        for (let i = 0; i < present; i++) {
+          const links = this.outputs[IMAGE_SLOT0 + i]?.links;
+          if (links && links.length) {
+            lastImage = Math.max(lastImage, Math.min(MAX_SLOTS - 1, i + 1));
+          }
+        }
+        const targetLen = IMAGE_SLOT0 + lastImage + 1;
+
+        let guard = 0;
+        while (this.outputs.length > targetLen && guard++ < MAX_SLOTS + 2) {
+          const idx = this.outputs.length - 1;
+          const links = this.outputs[idx]?.links;
+          if (links && links.length) break;
+          const before = this.outputs.length;
+          if (typeof this.removeOutput === "function") this.removeOutput(idx);
+          if (this.outputs.length >= before) {
+            this.outputs.splice(targetLen);
+            break;
+          }
+        }
+
+        guard = 0;
+        while (
+          this.outputs.length < targetLen &&
+          this.outputs.length < IMAGE_SLOT0 + MAX_SLOTS &&
+          guard++ < MAX_SLOTS + 2
+        ) {
+          const imageIndex = this.outputs.length - IMAGE_SLOT0;
+          const before = this.outputs.length;
+          if (typeof this.addOutput === "function") {
+            this.addOutput(imageOutputName(this, imageIndex), "IMAGE");
+          } else {
+            this.outputs.push({
+              name: imageOutputName(this, imageIndex),
+              type: "IMAGE",
+              links: null,
+            });
+          }
+          if (this.outputs.length === before) break;
+        }
+
+        for (let i = 0; i < this.outputs.length; i++) {
+          const o = this.outputs[i];
+          if (!o) continue;
+          o.hidden = i >= targetLen;
+          if (o.slot_index !== undefined) o.slot_index = i;
+        }
+        nameOutputs(this);
+        this._installHiddenOutputDraw();
+        this.setDirtyCanvas?.(true, true);
+        this.graph?.setDirtyCanvas?.(true, true);
+      } finally {
+        this._rilSyncing = false;
+      }
+    };
+
+    nodeType.prototype._installHiddenOutputDraw = function () {
+      if (nodeType.prototype._rilDrawPatched) return;
+      nodeType.prototype._rilDrawPatched = true;
+
+      // drawNode lives on LGraphNode, not this node type
+      let proto = nodeType.prototype;
+      while (proto && typeof proto.drawNode !== "function") {
+        proto = Object.getPrototypeOf(proto);
+      }
+      if (!proto || typeof proto.drawNode !== "function") return;
+
+      const origDrawNode = proto.drawNode;
+      proto.drawNode = function () {
+        const isOurs = this?.comfyClass === NODE_NAME || this?.type === NODE_NAME;
+        const full = this.outputs;
+        if (!isOurs || !full || !full.some((o) => o && o.hidden)) {
+          return origDrawNode.apply(this, arguments);
+        }
+        this.outputs = full.filter((o) => o && !o.hidden);
+        try {
+          return origDrawNode.apply(this, arguments);
+        } finally {
+          this.outputs = full;
+        }
+      };
+
+      if (typeof proto.getConnectionPos === "function") {
+        const origPos = proto.getConnectionPos;
+        proto.getConnectionPos = function (isInput, slot) {
+          const isOurs = this?.comfyClass === NODE_NAME || this?.type === NODE_NAME;
+          if (!isOurs || isInput || !this.outputs || !this.outputs.some((o) => o && o.hidden)) {
+            return origPos.apply(this, arguments);
+          }
+          let visual = 0;
+          for (let i = 0; i < slot && i < this.outputs.length; i++) {
+            if (!this.outputs[i]?.hidden) visual++;
+          }
+          const full = this.outputs;
+          this.outputs = full.filter((o) => o && !o.hidden);
+          try {
+            return origPos.call(this, isInput, visual);
+          } finally {
+            this.outputs = full;
+          }
+        };
+      }
+
+      if (typeof proto.computeSize === "function") {
+        const origSize = proto.computeSize;
+        proto.computeSize = function () {
+          const isOurs = this?.comfyClass === NODE_NAME || this?.type === NODE_NAME;
+          const full = this.outputs;
+          if (!isOurs || !full || !full.some((o) => o && o.hidden)) {
+            return origSize.apply(this, arguments);
+          }
+          this.outputs = full.filter((o) => o && !o.hidden);
+          try {
+            return origSize.apply(this, arguments);
+          } finally {
+            this.outputs = full;
+          }
+        };
+      }
     };
 
     nodeType.prototype._hideJsonWidget = function () {
@@ -757,7 +1168,7 @@ app.registerExtension({
       container.className = "ref-loader-10-grid";
       container.style.cssText = `
                 display: grid;
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: repeat(2, 1fr);
                 gap: ${GAP}px;
                 width: 100%;
                 height: 100%;
@@ -779,9 +1190,10 @@ app.registerExtension({
 
       domWidget.computeSize = () => {
         const n = this._activeCount || 10;
-        const rows = Math.ceil(n / 2);
+        const cols = getLayoutWidth(this);
+        const rows = Math.ceil(n / cols);
         const width = this.size?.[0] || NODE_WIDTH;
-        let cell = Math.floor((width - GRID_PAD * 2 - GAP) / 2);
+        let cell = Math.floor((width - GRID_PAD * 2 - GAP * (cols - 1)) / cols);
         cell = Math.max(MIN_CELL, Math.min(MAX_CELL, cell));
         const gridH = rows * cell + (rows - 1) * GAP + GRID_PAD * 2;
         return [width - 20, gridH];
@@ -1087,9 +1499,8 @@ app.registerExtension({
         if (slot) slot.style.display = i < n ? "flex" : "none";
       }
       if (this._gridContainer) {
-        this._gridContainer.style.gridTemplateRows = `repeat(${Math.ceil(
-          n / 2
-        )}, 1fr)`;
+        const cols = getLayoutWidth(this);
+        this._gridContainer.style.gridTemplateRows = `repeat(${Math.ceil(n / cols)}, 1fr)`;
       }
 
       if (doResize) {
@@ -1098,6 +1509,7 @@ app.registerExtension({
         this._updateGridSize();
         this.setDirtyCanvas?.(true, true);
       }
+      this._syncOutputs();
     };
 
     nodeType.prototype._handleFile = async function (index, file) {

@@ -60,7 +60,7 @@ def _parse_crops(crop_str):
         return out
     if isinstance(data, list):
         out = []
-        for i in range(10):
+        for i in range(16):
             if i < len(data) and data[i]:
                 out.append(_parse_one_crop(data[i]))
             else:
@@ -97,20 +97,24 @@ class TallronReferenceImageLoader:
         return {
             "required": {
                 "num_slots": ("INT", {
-                    "default": 10,
+                    "default": 2,
                     "min": 1,
-                    "max": 10,
+                    "max": 16,
                     "step": 1,
-                    "tooltip": "How many image cells to show (1-10). Ten outputs always exist."
+                    "tooltip": "How many image cells to show (1-16)."
+                }),
+                "layout_width": ("INT", {
+                    "default": 2,
+                    "min": 2,
+                    "max": 4,
+                    "step": 1,
+                    "tooltip": "Grid columns (2, 3, or 4). Node width auto-adjusts."
                 }),
                 "index_style": (
-                    ["Qwen (1-based)", "Flux (0-based)"],
+                    ["1-based", "0-based"],
                     {
-                        "default": "Qwen (1-based)",
-                        "tooltip": (
-                            "Qwen: first cell/output is Image 1. "
-                            "Flux: first cell/output is Image 0."
-                        ),
+                        "default": "1-based",
+                        "tooltip": "1-based: first cell/output is Image 1. 0-based: first is Image 0.",
                     },
                 ),
                 "images_json": ("STRING", {
@@ -122,12 +126,23 @@ class TallronReferenceImageLoader:
                     "min": 0.0,
                     "max": 16.0,
                     "step": 0.05,
-                    "tooltip": "Target megapixels for resized outputs & batch (0 = keep original size)"
+                    "tooltip": "Target megapixels for the individual Image outputs (0 = keep original size)."
                 }),
                 "upscale_method": (["lanczos", "nearest", "bilinear", "bicubic", "area", "nearest-exact"],),
                 "fit_mode": (["keep_aspect", "crop", "stretch", "pad"], {
                     "default": "keep_aspect",
-                    "tooltip": "How to fit images when resizing to megapixels"
+                    "tooltip": "How to fit images when resizing individual outputs to megapixels"
+                }),
+                "batch_longest": ("INT", {
+                    "default": 0,
+                    "min": 0,
+                    "max": 8192,
+                    "step": 64,
+                    "tooltip": "Scale every full-batch image so its longest side equals this (pixels). 0 = off. Shorter side is padded on one side."
+                }),
+                "multiple": (["8", "16", "32", "64"], {
+                    "default": "16",
+                    "tooltip": "Round image and batch dimensions up to a multiple of this value."
                 }),
             },
             "hidden": {
@@ -135,23 +150,22 @@ class TallronReferenceImageLoader:
             },
         }
 
-    RETURN_TYPES = (
-        "IMAGE", "IMAGE", "IMAGE", "IMAGE", "IMAGE",
-        "IMAGE", "IMAGE", "IMAGE", "IMAGE", "IMAGE",
-        "IMAGE", "IMAGE"
-    )
-    RETURN_NAMES = (
-        "Image 1", "Image 2", "Image 3", "Image 4", "Image 5",
-        "Image 6", "Image 7", "Image 8", "Image 9", "Image 10",
-        "batch", "Image 1 full size"
+    RETURN_TYPES = ("IMAGE", "IMAGE") + ("IMAGE",) * 16
+    RETURN_NAMES = ("Image 1 orig size", "full batch") + tuple(
+        f"Image {i}" for i in range(1, 17)
     )
     FUNCTION = "load"
     CATEGORY = "Tallron Handy Nodes"
     DESCRIPTION = (
-        "Reference Image Loader — up to 10 reference images in a resizable "
+        "Reference Image Loader — up to 16 reference images in a resizable "
         "2-wide grid. Empty slots return None. "
         "Each slot has a Crop button (top-left of the preview). "
-        "index_style switches labels between Qwen (Image 1…) and Flux (Image 0…)."
+        "Outputs, top to bottom: Image 1 orig size, full batch, then Image 1–16. "
+        "Image 1 and Image 2 stay visible; Image 3 appears when Image 2 is connected, and so on. "
+        "full batch carries the full-resolution images (after crop). "
+        "Optional batch_longest scales them to a longest side and pads the other side. "
+        "layout_width sets grid columns (2–4). "
+        "index_style: 1-based or 0-based labels."
     )
 
     def _parse_filenames(self, images_json):
@@ -162,7 +176,7 @@ class TallronReferenceImageLoader:
         if not isinstance(data, list):
             data = []
         out = []
-        for i in range(10):
+        for i in range(16):
             if i < len(data) and data[i]:
                 out.append(str(data[i]).strip())
             else:
@@ -252,29 +266,80 @@ class TallronReferenceImageLoader:
 
         return resized.movedim(1, -1)
 
-    def _make_batch(self, resized_list, empty_flags, num_slots):
+    def _round_multiple(self, n, multiple):
+        if multiple <= 1:
+            return max(1, n)
+        return max(multiple, ((int(n) + multiple - 1) // multiple) * multiple)
+
+    def _scale_longest(self, image, longest, method, multiple=1):
+        """Scale so the longest side equals `longest` (or keep size if 0), then snap to multiple."""
+        if image is None:
+            return image
+        B, H, W, C = image.shape
+        if longest and int(longest) > 0:
+            cur = max(H, W)
+            scale = float(longest) / float(cur)
+            nw = max(1, int(round(W * scale)))
+            nh = max(1, int(round(H * scale)))
+        else:
+            nw, nh = W, H
+        nw = self._round_multiple(nw, multiple)
+        nh = self._round_multiple(nh, multiple)
+        if nw == W and nh == H:
+            return image
+        img = image.movedim(-1, 1)
+        resized = comfy.utils.common_upscale(img, nw, nh, method, "disabled")
+        return resized.movedim(1, -1)
+
+    def _make_batch(self, image_list, empty_flags, num_slots, batch_longest=0, method="lanczos", multiple=16):
+        """
+        Build the full batch.
+
+        If batch_longest > 0, each image is scaled so its longest side equals that
+        value (aspect preserved). Dimensions are rounded up to `multiple`.
+        Images are padded on one side (right / bottom) to a common canvas.
+        """
         loaded = []
-        for i in range(min(num_slots, len(resized_list))):
-            if not empty_flags[i] and resized_list[i] is not None:
-                loaded.append(resized_list[i])
+        for i in range(min(num_slots, len(image_list))):
+            if not empty_flags[i] and image_list[i] is not None:
+                loaded.append(image_list[i])
 
         if not loaded:
             return None
 
-        ref = loaded[0]
-        _, rh, rw, _ = ref.shape
+        multiple = max(1, int(multiple or 1))
+        longest = int(batch_longest or 0)
+        loaded = [self._scale_longest(img, longest, method, multiple) for img in loaded]
+
+        max_h = max(img.shape[1] for img in loaded)
+        max_w = max(img.shape[2] for img in loaded)
+        max_h = self._round_multiple(max_h, multiple)
+        max_w = self._round_multiple(max_w, multiple)
+
         aligned = []
         for img in loaded:
-            if img.shape[1] == rh and img.shape[2] == rw:
+            _, h, w, _ = img.shape
+            if h == max_h and w == max_w:
                 aligned.append(img)
-            else:
-                t = img.movedim(-1, 1)
-                t = comfy.utils.common_upscale(t, rw, rh, "lanczos", "center")
-                aligned.append(t.movedim(1, -1))
+                continue
+            pad_h = max_h - h
+            pad_w = max_w - w
+            # Even padding on both sides (center)
+            pt, pb = pad_h // 2, pad_h - pad_h // 2
+            pl, pr = pad_w // 2, pad_w - pad_w // 2
+            padded = torch.nn.functional.pad(
+                img, (0, 0, pl, pr, pt, pb), mode="constant", value=0.0
+            )
+            aligned.append(padded)
+
         return torch.cat(aligned, dim=0)
 
-    def load(self, num_slots, index_style, images_json, megapixels, upscale_method, fit_mode, crop=""):
-        num_slots = max(1, min(10, int(num_slots)))
+    def load(self, num_slots, layout_width, index_style, images_json, megapixels, upscale_method, fit_mode, batch_longest=0, multiple="16", crop=""):
+        num_slots = max(1, min(16, int(num_slots)))
+        try:
+            multiple = int(multiple)
+        except Exception:
+            multiple = 16
         filenames = self._parse_filenames(images_json)
         crop_boxes = _parse_crops(crop)
 
@@ -282,7 +347,7 @@ class TallronReferenceImageLoader:
         empty_flags = []
         full_size_1 = None
 
-        for i in range(10):
+        for i in range(16):
             name = filenames[i] if i < num_slots else ""
             img, is_empty = self._load_single(name)
             if img is not None and crop_boxes[i] is not None:
@@ -297,12 +362,25 @@ class TallronReferenceImageLoader:
             if is_empty or img is None:
                 resized.append(None)
             else:
-                resized.append(
-                    self._resize_to_megapixels(img, megapixels, upscale_method, fit_mode)
-                )
+                r = self._resize_to_megapixels(img, megapixels, upscale_method, fit_mode)
+                if r is not None and multiple > 1:
+                    B, H, W, C = r.shape
+                    nh = self._round_multiple(H, multiple)
+                    nw = self._round_multiple(W, multiple)
+                    if nh != H or nw != W:
+                        t = r.movedim(-1, 1)
+                        t = comfy.utils.common_upscale(t, nw, nh, upscale_method, "disabled")
+                        r = t.movedim(1, -1)
+                resized.append(r)
 
-        batch = self._make_batch(resized, empty_flags, num_slots)
-        return (*resized, batch, full_size_1)
+        full_batch = self._make_batch(images, empty_flags, num_slots, batch_longest, upscale_method, multiple)
+        # Preview and most IMAGE nodes cannot accept None. Empty batch/orig get a
+        # tiny placeholder so connected PreviewImage nodes do not crash.
+        if full_batch is None:
+            full_batch = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
+        if full_size_1 is None:
+            full_size_1 = torch.zeros((1, 64, 64, 3), dtype=torch.float32)
+        return (full_size_1, full_batch, *resized)
 
 
 NODE_CLASS_MAPPINGS = {

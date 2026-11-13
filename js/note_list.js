@@ -8,6 +8,7 @@ const ROW_COLLAPSED_H = 36;
 const ROW_BODY_CHROME = 16; // body padding when expanded (no action bar)
 const TEXTAREA_MIN_H = 48;
 const TEXTAREA_MAX_H = 400;
+const SIZE_UPDATE_MS = 180; // debounce node resize while typing (prevents caret bugs)
 
 // ---------------------------------------------------------------------------
 // CSS (injected once)
@@ -35,6 +36,7 @@ function injectCSS() {
 .tnl-content {
     user-select: text;
     -webkit-user-select: text;
+    caret-color: #8ec8ff;
 }
 .tnl-header {
     display: flex;
@@ -541,6 +543,7 @@ app.registerExtension({
                 listEl: null,
                 domWidget: null,
                 dragId: null,
+                _sizeTimer: null,
             };
 
             hideWidget(this, "notes_json");
@@ -737,13 +740,32 @@ app.registerExtension({
 
         nodeType.prototype._tnlPersist = function () {
             writeState(this, this._tnl.notes, this._tnl.activeId);
-            this._tnlUpdateSize();
+            // Structural changes (add/delete/reorder/expand) should size promptly
+            this._tnlDoUpdateSize();
         };
 
+        // Debounced size update — prevents caret jump/loss while typing
         nodeType.prototype._tnlUpdateSize = function () {
+            if (this._tnl._sizeTimer) clearTimeout(this._tnl._sizeTimer);
+            this._tnl._sizeTimer = setTimeout(() => {
+                this._tnl._sizeTimer = null;
+                this._tnlDoUpdateSize();
+            }, SIZE_UPDATE_MS);
+        };
+
+        // Immediate size measurement + apply (used after structural changes)
+        nodeType.prototype._tnlDoUpdateSize = function () {
             const dw = this._tnl.domWidget;
             if (!dw) return;
-            // Prefer measuring real expanded textareas after layout
+
+            // Preserve caret if a note textarea currently has focus
+            const active = document.activeElement;
+            let selStart = null, selEnd = null;
+            if (active && active.classList && active.classList.contains("tnl-content")) {
+                selStart = active.selectionStart;
+                selEnd = active.selectionEnd;
+            }
+
             requestAnimationFrame(() => {
                 const size = dw.computeSize();
                 // Refine height from actual DOM if available
@@ -761,6 +783,14 @@ app.registerExtension({
                 }
                 this.setSize?.([this.size?.[0] || NODE_WIDTH, this.size?.[1] || 320]);
                 this.setDirtyCanvas?.(true, true);
+
+                // Restore caret after layout
+                if (active && selStart !== null && document.activeElement === active) {
+                    try {
+                        active.selectionStart = selStart;
+                        active.selectionEnd = selEnd;
+                    } catch (_) {}
+                }
             });
         };
 
@@ -894,20 +924,19 @@ app.registerExtension({
                 empty.textContent =
                     "No notes yet.\nClick “+ Add Note” to create one.";
                 list.appendChild(empty);
-                this._tnlUpdateSize();
+                this._tnlDoUpdateSize();
                 return;
             }
 
             for (const note of notes) {
                 list.appendChild(this._tnlCreateRow(note));
             }
-            this._tnlUpdateSize();
-            // Autosize expanded textareas after they are in the DOM
+            // Autosize expanded textareas after they are in the DOM, then size once
             requestAnimationFrame(() => {
                 list.querySelectorAll(".tnl-content").forEach((ta) => {
                     if (ta.closest(".tnl-body.open")) autosizeTextarea(ta);
                 });
-                this._tnlUpdateSize();
+                this._tnlDoUpdateSize();
             });
         };
 
